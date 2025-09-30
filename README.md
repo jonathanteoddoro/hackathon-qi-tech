@@ -227,8 +227,6 @@ erDiagram
 
 ## 4. Estrutura de Front-end
 
-A solução de pagamentos via WhatsApp requer uma interface web para administração e configuração, além de uma integração direta com a API do WhatsApp Business. A estrutura de front-end proposta utiliza tecnologias modernas para garantir uma experiência de usuário otimizada e responsiva.
-
 ### Arquitetura do Front-end
 
 A aplicação front-end será desenvolvida utilizando React.js com TypeScript, proporcionando uma base sólida para desenvolvimento escalável e manutenível. A arquitetura seguirá o padrão de componentes reutilizáveis e gerenciamento de estado centralizado.
@@ -290,16 +288,7 @@ src/
 - Dashboard Administrativo: visão geral das transações, usuários ativos e métricas de performance; gráficos interativos (volume, métodos, tendências).
 - Gerenciamento de Usuários: visualizar, editar e gerenciar usuários, métodos de pagamento e histórico de transações.
 - Painel de Transações: listagem detalhada com filtros por data, status, valor e tipo; busca e exportação.
-- Configurações de Integração WhatsApp: gerenciamento de webhooks, tokens e parâmetros da API do WhatsApp Business.
 
-### Integração com WhatsApp
-
-A integração com o WhatsApp será realizada através da WhatsApp Business API, permitindo:
-
-- Envio de mensagens automatizadas: confirmações de pagamento, notificações de saldo.
-- Recebimento de comandos: processamento de comandos de pagamento via mensagem.
-- Interface de chat: simulação de interface de chat para testes e operação.
-- Geração de QR Codes: para pagamentos rápidos via Pix.
 
 ### Responsividade e Acessibilidade
 
@@ -314,40 +303,119 @@ A interface será totalmente responsiva, adaptando-se a diferentes tamanhos de t
 
 ---
 
-## 5. Fluxos e Integrações 
+## 5. Fluxos e Integrações
 
-1. Produtor cria proposal → anexa provas e tokeniza colateral (mint NFT/receipt).
-2. Proposal fica OPEN e é indexada no marketplace (score, LTV recomendado).
-3. Investidor analisa e financia total ou parcialmente (funding on‑chain / off‑chain).
-4. Quando condições atendidas, drawdown libera fundos ao produtor.
-5. Produtor realiza repayment parcial/total após venda da safra.
-6. Em caso de default, procedure de seize é executada conforme termos.
+Abaixo os fluxos principais, simplificados e organizados em partes para facilitar a visualização.
 
-**Integrações principais**: IPFS (documentos), oráculos (preço commodity), provedores de stablecoin / gateways, serviços KYC, INCRA/Receita para verificação.
+Dashboard → Investimento
+- O que acontece: o investidor vê propostas disponíveis no dashboard.
+- Ação: ao clicar em "Investir", o frontend envia uma requisição ao Backend API.
+- Resultado: o Backend registra a intenção no banco e inicia o processo de funding (on‑chain ou via gateway); o status é exibido ao usuário.
+
+Financiamento → Drawdown
+- O que acontece: o investidor financia total ou parcialmente uma proposta.
+- Ação: os fundos são alocados no mercado de lending (ex.: Morpho) via transação on‑chain.
+- Resultado: quando liberado, o drawdown transfere os fundos para a carteira do produtor; o Backend persiste o tx_hash e atualiza o status no banco.
+
+Recebimento / Conversão
+- O que acontece: o produtor recebe cripto na carteira.
+- Ação: se precisar de reais, o produtor solicita conversão via parceiro on/off‑ramp.
+- Resultado: o parceiro realiza o payout em BRL; o Backend registra a confirmação.
+
+Repagamento
+- O que acontece: após a venda da safra o produtor faz o repay on‑chain.
+- Ação: repay() no protocolo distribui os valores aos investidores.
+- Resultado: o evento é capturado e o Backend atualiza reembolsos e saldos; tx_hash fica armazenado para auditoria.
+
+Tokenização de Garantia
+- O que acontece: colheita/recibo é tokenizada (NFT/receipt).
+- Ação: o Backend pede mint do token e grava o token_uri/metadata.
+- Resultado: o token serve como garantia vinculada à proposta; o hash/URI é salvo no banco.
+
+Armazenamento e Verificação (IPFS / KYC)
+- O que acontece: documentos e snapshots são armazenados e KYC é verificado.
+- Ação: o Backend envia documentos para storage (IPFS/S3) e requisita verificação KYC quando necessário.
+- Resultado: hashes/links e status KYC são salvos para consulta e compliance.
+
+Diagrama simplificado (Mermaid)
+
+```mermaid
+flowchart LR
+  Produtor[Produtor] -->|cria proposta| Backend[Backend API]
+  Backend -->|salva proposta| DB[(Banco)]
+  Backend -->|registra metadata| IPFS[IPFS S3]
+
+  Investidor[Investidor] -->|inicia investimento| Frontend[Frontend]
+  Frontend -->|POST /invest| Backend
+  Backend -->|aloca fundos onchain| Morpho[Pool Morpho]
+  Morpho -->|drawdown| ProdutorWallet[Carteira do Produtor]
+  ProdutorWallet -->|opcional: converte| Ramp[OnOffRamp]
+  Ramp -->|payout BRL| Produtor
+
+  ProdutorWallet -->|repay| Morpho
+  Morpho -->|distribui| InvestidorWallet[Carteira do Investidor]
+  Morpho -->|emite eventos| Indexer[Indexador]
+  Indexer -->|persiste tx_hash| DB
+
+  Backend -->|mint token| Token[Token Garantia]
+  Token -->|token_uri| DB
+
+  style DB fill:#f2f9ff
+  style Morpho fill:#fff7f0
+```
 
 ---
 
-## 6. Esqueleto de Backend
+## 6. Exemplo de estrutura
 
-Stack recomendado: Node.js + TypeScript (Fastify/Express), PostgreSQL (Prisma/TypeORM), Redis, RabbitMQ/Kafka, ethers.js para Web3.
+Resumo
+- Exemplos minimalistas para ilustrar a integração entre frontend, backend, indexador on‑chain e persistência (Postgres). Stack sugerido: Node.js + TypeScript (Fastify), Prisma, ethers.js, React + TypeScript + Tailwind.
 
-Endpoints essenciais:
-- POST /api/proposals
-- GET /api/proposals
-- POST /api/proposals/:id/fund
-- POST /api/loans/:id/repay
-- POST /api/scores/compute
+### Backend API (Node.js + TypeScript)
+O backend expõe uma API REST/HTTP e handlers para eventos on‑chain. Responsabilidades principais:
+- Endpoints: criar/listar propostas, iniciar investimento, emitir drawdown, registrar reembolsos.
+- Indexador: consome eventos (LoanCreated, Repayment) e persiste tx_hash + payload_raw.
+- Integrações: IPFS (metadata), Morpho (pool), on/off‑ramp (conversão), KYC.
+- Segurança: autenticação JWT, validação de requests e uso de vault para secrets.
 
-Boas práticas: validação, idempotência, correlação on‑chain/off‑chain (tx_hash), testes automatizados.
+Principais funcionalidades:
+- POST /propostas — cria proposta e grava termos_ipfs_hash.
+- POST /investimentos — registra intenção e aciona funding on‑chain.
+- Webhook/Listener on‑chain — persiste eventos com tx_hash para auditoria.
 
----
+### Frontend Dashboard (React + TypeScript)
+Interface para investidores e produtores:
+- Componentes: lista de propostas, formulário de criação de proposta, fluxo de investimento e visualização de status on‑chain.
+- Integração wallet: conectar MetaMask/WalletConnect para assinar transações on‑chain.
+- UX: mostrar status do tx (PENDENTE → CONFIRMADA) consultando records off‑chain (tx_hash) e consultas on‑chain.
+
+Componentes principais:
+- ProposalList, ProposalForm, InvestModal, LoanStatusCard.
+
+### Estrutura do Banco de Dados (Postgres) — características
+- UUIDs para PKs; JSONB para raw events e metadados.
+- Indices em tx_hash, proposta_id, emprestimo_id.
+- Tabelas relevantes: propostas, emprestimos, reembolsos, transacoes, eventos_onchain, garantias_token, pontuacoes.
+- Boas práticas: constraints, FK, e jobs de reconciliação on‑chain ↔ off‑chain.
+
+
+### Exemplo de fluxo completo (simplificado)
+1. Investidor clica em "Investir" no dashboard → Frontend POST /investimentos → Backend cria registro e aciona transação on‑chain (via ethers.js).
+2. Transação on‑chain é emitida em Morpho → Indexador captura LoanCreated com tx_hash e persiste em eventos_onchain.
+3. Backend atualiza EMPRESTIMOS com morpho_tx_hash → UI exibe status com link para explorer.
+4. Quando produtor repay(), Indexador captura Repayment → Backend marca REEMBOLSOS e atualiza saldos dos investidores.
+
+Segurança e operação
+- Validar origem dos eventos on‑chain (address do contrato).
+- Trabalhar com N confirmações antes de considerar a operação finalizada.
+- Rastrear raw_event_json para auditoria.
+
 
 ## 7. Considerações de Implementação
 
 **Infra & serviços**:
 - API: Node.js 18+ (Fastify/Express)
 - DB: PostgreSQL 13+
-- Mensageria: RabbitMQ / Kafka
 - Storage: IPFS/S3
 - Blockchain: Rede EVM (Polygon/Gnosis)
 - Oráculos: Chainlink ou custom
@@ -356,13 +424,8 @@ Boas práticas: validação, idempotência, correlação on‑chain/off‑chain 
 **Segurança & compliance**:
 - Auditoria de smart contracts
 - Vault para segredos
-- LGPD: consentimento, eliminação, exportação de dados
 - KYC e verificação documental (INCRA/Receita onde possível)
 
-**Custos estimados (ex.)**
-- Infra: R$ 3.000–6.000 / mês
-- IPFS/Storage: R$ 200–800 / mês
-- Monitoramento: R$ 500–1.500 / mês
 
 **KPIs sugeridos**
 - Produtores cadastrados e investidores ativos
@@ -375,10 +438,6 @@ Boas práticas: validação, idempotência, correlação on‑chain/off‑chain 
 ## Próximos passos práticos
 
 1. Gerar esqueleto do backend (Prisma + Fastify) e migrações do schema.
-2. Criar smart contract MVP (Proposal/Loan/Collateral) e testes em Hardhat.
+2. Criar smart contract MVP (Proposal/Loan/Collateral) em Solidity.
 3. Desenvolver frontend minimal para criar proposals e investir (integração wallet).
 4. Implementar pipeline inicial de score com dados sintéticos e endpoint de cálculo.
-
----
-
-Se quiser, eu posso: gerar a migration SQL/Prisma a partir deste schema, escrever o smart contract MVP em Solidity com testes em Hardhat, ou criar o esqueleto do backend (pronto para rodar). Qual você prefere que eu faça primeiro?
