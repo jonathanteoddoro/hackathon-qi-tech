@@ -507,3 +507,59 @@ Próximos passos técnicos
 2. Criar smart contract MVP (Proposal/Loan/Collateral) em Solidity.
 3. Desenvolver frontend minimal para criar proposals e investir (integração wallet).
 4. Implementar pipeline inicial de score com dados sintéticos e endpoint de cálculo.
+
+
+
+
+## Personas
+
+### Persona 1 — Agricultor
+
+- **Nome:** João Pereira  
+- **Idade:** 42  
+- **Gênero:** Masculino  
+- **Localização:** Sorriso, MT
+
+**Dificuldades:** João vive o desafio de levantar capital de forma rápida, sem enfrentar custos imprevisíveis ou burocracias intermináveis. Para isso, precisa que seus documentos e recibos de armazenagem sejam facilmente aceitos como garantia, mas nem sempre encontra essa clareza no processo. Enquanto isso, a volatilidade no preço da soja atrapalha ainda mais: ao longo do ciclo produtivo, o valor de sua garantia cai e o LTV diminui, deixando-o em uma posição frágil. Mesmo quando decide transformar a soja em liquidez, esbarra na logística complicada e no tempo necessário para que a garantia física se converta em dinheiro — seja por meio de leilões ou retiradas.
+
+**Objetivos**
+- Financiar insumos para a safra com menor custo.
+- Receber BRL em tempo hábil.
+- Manter controle sobre a produção.
+
+**Valores**
+- Previsibilidade financeira
+- Simplicidade operacional
+- Transparência nas taxas de empréstimo
+
+**Interesses**
+- Melhorar produtividade
+- Otimizar logística de armazenagem
+- Construir reputação para obter melhores condições de crédito
+
+---
+
+### Persona 2 — Investidor
+
+- **Nome:** Marina Oliveira  
+- **Idade:** 35  
+- **Gênero:** Feminino  
+- **Localização:** Campinas, SP
+
+**Dificuldades:** Marina está sempre em busca de oportunidades que tragam rentabilidade real e ajudem a diversificar sua carteira, mas esse caminho raramente é simples. Quando tenta comparar alternativas de investimento, se perde em custos pouco claros, prazos de liquidação incertos e contrapartes que nem sempre inspiram confiança. Ao mesmo tempo, sente falta de transparência e de informações organizadas que mostrem com clareza o que está em jogo, permitindo avaliar riscos e retornos de forma segura. Sem esses elementos, cada decisão consome um tempo precioso, exige esforço adicional e deixa Marina insegura sobre a melhor forma de entrar ou sair de uma posição.
+
+**Objetivos**
+- Diversificar a carteira com crédito agrícola de baixo custo operacional.
+- Obter retornos superiores à renda fixa.
+- Monitorar risco por coorte.
+
+**Valores**
+- Transparência
+- Dados verificáveis
+- Controle sobre exposição e liquidez
+
+**Interesses**
+- Monitoramento de risco (LTV, PD)
+- Informação detalhada sobre o ativo (commodity, histórico)
+- Comparação de taxas e oportunidades de mercado
+- Segurança e auditabilidade das aplicações
