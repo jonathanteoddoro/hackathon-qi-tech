@@ -11,10 +11,20 @@ A convergência de tecnologias emergentes como blockchain e machine learning tem
 Com base nessa reputação, também é possível classificar o risco para o investidor que está disponibilizando o capital, fornecendo uma visão clara do perfil de risco associado a cada operação. Algoritmos de inteligência artificial podem combinar dados históricos de safras, preços de commodities e comportamento de crédito para ajustar automaticamente a avaliação de risco e propor condições de empréstimo mais seguras e personalizadas. Sistemas de análise antifraude podem validar informações de produtores através de bases de dados públicas como INCRA e Receita Federal, oferecendo camadas adicionais de segurança e transparência para investidores.
 
 
-## Proposta: Marketplace de Crédito Agrícola P2P (agricultores ↔ investidores)
+## Proposta
 
+O projeto propõe a criação de um **marketplace de crédito agrícola P2P (MVP)** que conecta diretamente produtores rurais e investidores, utilizando tecnologia blockchain para oferecer transparência, eficiência e segurança. A plataforma resolve uma dor histórica do setor: o acesso limitado e caro ao crédito agrícola tradicional, marcado por intermediários, burocracia e taxas elevadas.
 
-Plataforma marketplace que conecta produtores rurais (tomadores) a investidores (provedores de capital). Produtores tokenizam parte da colheita como garantia (recibos, notas de armazenagem, NFTs) e solicitam empréstimos para financiar insumos até a venda da safra. Investidores avaliam propostas com métricas de risco (score on‑chain/off‑chain, preços de commodities via oráculos) e decidem financiar total ou parcialmente operações.
+### Escopo do MVP
+Para validar a viabilidade técnica e de mercado, o MVP opera com:
+- **1 commodity**: Soja (maior liquidez e padronização no mercado)
+- **1 região**: Mato Grosso (infraestrutura de armazéns estabelecida)
+
+Na solução proposta, os produtores rurais podem **tokenizar sua produção futura**, utilizando recibos de armazenagem digitalizados. Esses ativos funcionam como garantias dentro do protocolo, permitindo que empréstimos sejam concedidos de forma mais ágil e com custos reduzidos.
+
+Do outro lado, investidores acessam uma oportunidade de aplicação atrelada ao agronegócio, com métricas claras de risco e retorno. A plataforma oferece indicadores como **Loan-to-Value (LTV)** baseado em oráculos de preço da soja, além de informações sobre histórico e reputação do produtor.
+
+O resultado é um sistema em que o crédito deixa de depender de instituições financeiras tradicionais e passa a operar em um modelo **peer-to-peer**, sustentado por contratos inteligentes auditáveis que funcionam de forma transparente nos bastidores. Essa abordagem aumenta a previsibilidade para o produtor, gera novas oportunidades de investimento e promove maior inclusão financeira no campo.
 
 ### Objetivos principais
 
@@ -204,42 +214,65 @@ erDiagram
 	- tipo: LOAN / REEMBOLSO / SEIZURE (VARCHAR).
 	- criado_em: Timestamp de criação (TIMESTAMP).
 
-### Considerações de Arquitetura
+## 3. Considerações de Arquitetura
 
-#### Segurança
-- Criptografia de dados sensíveis (PII) em repouso e em trânsito.
-- Campos de KYC encriptados.
-- Uso de vault para gerenciamento seguro de chaves.
+A plataforma é organizada em camadas bem definidas, cada uma responsável por uma função crítica no ecossistema de crédito agrícola.
 
-#### Consistência
-- Transações ACID para operações financeiras críticas.
-- Uso de filas (RabbitMQ/Kafka) para conciliação eventual entre eventos on‑chain e off‑chain.
+**Camada Blockchain:** A infraestrutura base utiliza **Base** (L2 da Coinbase), permitindo transações rápidas e econômicas, com boa liquidez USDC e suporte robusto. Essa camada opera de forma transparente, com usuários nunca precisando interagir diretamente com a blockchain.
 
-#### Escalabilidade
-- Sharding por região ou commodity, se necessário.
-- Read‑replicas para consultas analíticas.
+**Protocolo de Empréstimo:** No núcleo da plataforma, o **Morpho Blue** gerencia 1-2 mercados de empréstimos isolados para soja, com regras de LTV e taxas específicas, otimizando segurança e eficiência.
 
-#### Auditoria
-- Triggers e tabelas de `_audit_log_` para alterações críticas (mudança de status, drawdown, seize de garantia).
+**Stablecoin:** Para liquidez e estabilidade financeira, a plataforma opera exclusivamente com **USDC** no MVP, porém apresentado ao usuário sempre em **valores BRL equivalentes** para familiaridade.
 
-#### Gestão de Risco
-- Tabela `risk_profiles` consolidando LTV, score, PD e recomendações por empréstimo.
+**Oráculos:** A precificação das garantias é feita por **Chainlink**, que fornece preços da soja atualizados. Como fallback, admins podem atualizar preços manualmente via multi-sig em casos emergenciais.
+
+**Colateral:** NFTs **ERC-721 simplificados** representam lotes de soja depositados em armazéns certificados, contendo metadados essenciais (quantidade, localização, data de depósito, hash do certificado CDA/WA). Para o usuário, isso é apresentado como "Certificado Digital de Garantia".
+
+**Frontend:** A interface do usuário é construída em **Next.js 14** com **TypeScript**, oferecendo experiência web tradicional sem referências explícitas a blockchain. Sistema exibe dashboards intuitivos: propostas de empréstimo, investimentos disponíveis, monitoramento de posições e indicadores de risco em linguagem acessível.
+
+**Account Abstraction (ERC-4337):** Cada usuário recebe uma **smart contract wallet** criada automaticamente no primeiro acesso, sem necessidade de instalar extensões ou gerenciar chaves privadas. Features incluem:
+- **Social login**: Cadastro via email, telefone ou Google/Apple
+- **Gasless transactions**: Plataforma paga gas fees em nome do usuário (meta-transactions)
+- **Recovery**: Recuperação de conta via email/SMS, sem seed phrases
+- **Batch operations**: Múltiplas ações em uma única transação para melhor UX
+- **Session keys**: Permissões temporárias para operações rotineiras sem aprovar cada ação
+
+**Backend e Infraestrutura:** Um backend em **Node.js + Express** gerencia lógica off-chain, autenticação de usuários, validação automatizada de documentos, scoring e histórico de transações, com dados armazenados em **PostgreSQL**. Metadados de NFTs são mantidos em **IPFS via Pinata**. O frontend é hospedado em **Vercel**, o backend em **Railway/Render**, e nodes RPC são fornecidos por **Alchemy**.
+
+**Validação Automatizada & ML:**
+- **OCR + Computer Vision**: Extração automática de dados de documentos (CPF, CNH, CDA/WA)
+- **Validação de documentos**: Modelos ML verificam autenticidade de certificados e assinaturas
+- **Scoring básico**: Análise de histórico de transações na plataforma e dados fornecidos
+- **Anti-fraude**: Detecção de padrões suspeitos e documentos alterados
+
+**Conversão Fiat-Crypto:** Integração com **on/off-ramp partners** (MoonPay, Ramp Network, Transak) permite que usuários depositem/retirem via **Pix** sem interagir diretamente com crypto. O fluxo é: Pix → USDC (invisível) → Empréstimo, e na volta: Repagamento → USDC (invisível) → Pix.
+
+Essa arquitetura abstrai completamente a complexidade blockchain, permitindo que o MVP seja operacional e acessível para usuários sem conhecimento técnico, validando a hipótese central do negócio com experiência de usuário equivalente a fintechs tradicionais.
+
+O diagrama abaixo ilustra a arquitetura geral e o fluxo de interação entre os componentes:
+
+![alt text](image.png)
+
+
+Esse diagrama mostra como produtores e investidores interagem com uma interface tradicional, como a camada de Account Abstraction esconde toda complexidade blockchain, como o backend orquestra conversões Pix-crypto e valida documentos via ML, e como os contratos inteligentes e oráculos operam de forma transparente garantindo segurança e auditabilidade sem comprometer a experiência do usuário.
 
 ## 4. Estrutura de Front-end
 
 ### Arquitetura do Front-end
 
-A aplicação front-end será desenvolvida utilizando React.js com TypeScript, proporcionando uma base sólida para desenvolvimento escalável e manutenível. A arquitetura seguirá o padrão de componentes reutilizáveis e gerenciamento de estado centralizado.
+A interface será implementada em Next.js 14 + TypeScript com foco em clareza para produtores e investidores. A UX traduz conceitos financeiros para linguagem simples; toda complexidade on‑chain fica encapsulada no backend / account abstraction para que o usuário veja ações familiares (Pix, recibo, comprovante).
 
 ### Tecnologias Principais
 
-- React.js 18+: Framework principal para construção da interface de usuário
-- TypeScript: Para tipagem estática e melhor experiência de desenvolvimento
-- React Router: Para navegação entre páginas
-- Axios: Para comunicação com APIs
-- React Hook Form: Para gerenciamento de formulários
+- Next.js 14 + TypeScript
+- Tailwind CSS (estilos utilitários)
+- React Query / SWR (cache e sincronização)
+- ethers.js (integração on‑chain via serviços)
+- Axios (chamadas REST)
+- Recharts / Chart.js (visualizações)
+- Lucide / Heroicons (ícones)
 
-### Estrutura de Componentes 
+### Estrutura de Componentes (exemplo)
 
 ```text
 src/
@@ -248,190 +281,223 @@ src/
 │   │   ├── Header.tsx
 │   │   ├── Sidebar.tsx
 │   │   ├── Footer.tsx
-│   │   └── LoadingSpinner.tsx
-│   ├── forms/
-│   │   ├── PaymentForm.tsx
-│   │   ├── UserRegistrationForm.tsx
-│   │   └── MerchantForm.tsx
-│   ├── dashboard/
-│   │   ├── TransactionChart.tsx
-│   │   ├── BalanceCard.tsx
-│   │   └── RecentTransactions.tsx
-│   └── payments/
-│       ├── PaymentButton.tsx
-│       └── QRCodeGenerator.tsx
+│   │   └── EmptyState.tsx
+│   ├── proposals/
+│   │   ├── ProposalCard.tsx
+│   │   ├── ProposalForm.tsx
+│   │   └── ProposalHistory.tsx
+│   ├── investments/
+│   │   ├── InvestModal.tsx
+│   │   ├── InvestmentList.tsx
+│   │   └── InvestmentStatusCard.tsx
+│   ├── producer/
+│   │   ├── CollateralTokenView.tsx
+│   │   └── WarehouseInfo.tsx
+│   ├── investor/
+│   │   └── PortfolioOverview.tsx
+│   └── ui/
+│       ├── ConfirmButton.tsx
+│       └── StatusBadge.tsx
 ├── pages/
-│   ├── Dashboard.tsx
-│   ├── Transactions.tsx
-│   ├── Users.tsx
-│   ├── Merchants.tsx
-│   └── Settings.tsx
+│   ├── /dashboard.tsx
+│   ├── /propostas/index.tsx
+│   ├── /propostas/[id].tsx
+│   ├── /minha-conta.tsx
+│   └── /admin/* (rotas restritas)
 ├── hooks/
 │   ├── useAuth.ts
-│   ├── useTransactions.ts
-│   └── usePayments.ts
+│   ├── usePropostas.ts
+│   ├── useInvestments.ts
+│   └── useWallet.ts
 ├── services/
 │   ├── api.ts
-│   ├── paymentService.ts
+│   ├── onchainService.ts
+│   ├── ipfsService.ts
+│   └── oraclesService.ts
 ├── types/
-│   ├── user.ts
-│   ├── transaction.ts
-│   └── merchant.ts
+│   ├── produtor.ts
+│   ├── investidor.ts
+│   ├── proposta.ts
+│   └── emprestimo.ts
 └── utils/
-	├── formatters.ts
-	├── validators.ts
-	└── constants.ts
+    ├── formatters.ts
+    ├── validators.ts
+    └── constants.ts
 ```
 
-### Principais Funcionalidades da Interface
+### Principais funcionalidades da interface
 
-- Dashboard Administrativo: visão geral das transações, usuários ativos e métricas de performance; gráficos interativos (volume, métodos, tendências).
-- Gerenciamento de Usuários: visualizar, editar e gerenciar usuários, métodos de pagamento e histórico de transações.
-- Painel de Transações: listagem detalhada com filtros por data, status, valor e tipo; busca e exportação.
+- Visão Geral (Dashboard)
+  - Painel único com propostas abertas, volume financiado, posição do investidor/produtor e indicadores de risco (LTV, score, PD).
+  - Gráficos interativos: evolução do volume financiado, rentabilidade por coorte e variação do preço da commodity.
+  - Ações rápidas: investir, acompanhar status do drawdown, solicitar saque.
+
+- Ciclo de Propostas (Produtor)
+  - Formulário guiado para criar proposta com upload de documentos e tokenização de garantia (NFT/receipt) via backend.
+  - Visualização clara de LTV sugerido, simulações de custo total e prazos.
+  - Histórico da proposta: funding, morpho_tx_hash, drawdown e reembolsos.
+
+- Fluxo de Investimento (Investidor)
+  - Lista filtrável e ordenável de oportunidades (retorno, risco, prazo, commodity).
+  - Modal de investimento com resumo de impacto (ex.: quanto financio, participação % e retorno estimado).
+  - Status em linguagem simples: “Pendente on‑chain”, “Financiado”, “Drawdown realizado”, “Em repagamento”.
 
 
-### Responsividade e Acessibilidade
+- Pagamentos e Conversões
+  - Integração com on/off‑ramp para conversão USDC ↔ BRL apresentada como transferência bancária (Pix) para o usuário.
+  - Registro de tx_hash e comprovantes no histórico da proposta/emprestimo.
+  - Opções de reembolso: parcelado, antecipado, ou pagamento único via Pix.
 
-A interface será totalmente responsiva, adaptando-se a diferentes tamanhos de tela (desktop, tablet, mobile). Seguirá as diretrizes de acessibilidade WCAG 2.1.
 
-### Segurança no Front-end
-
-- Autenticação JWT: Tokens seguros para autenticação de usuários.
-- Validação de entrada: validação rigorosa de todos os dados inseridos no cliente.
-- Sanitização: prevenção contra ataques XSS e injeção.
-- HTTPS obrigatório: todas as comunicações criptografadas.
 
 ---
 
 ## 5. Fluxos e Integrações
 
-Abaixo os fluxos principais, simplificados e organizados em partes para facilitar a visualização.
+A plataforma contempla três fluxos principais: solicitação de empréstimo pelo produtor, fornecimento de capital pelo investidor e liquidação/repagamento dos empréstimos. Cada fluxo abstrai a complexidade blockchain, oferecendo experiência intuitiva equivalente a aplicações web tradicionais.
 
-Dashboard → Investimento
-- O que acontece: o investidor vê propostas disponíveis no dashboard.
-- Ação: ao clicar em "Investir", o frontend envia uma requisição ao Backend API.
-- Resultado: o Backend registra a intenção no banco e inicia o processo de funding (on‑chain ou via gateway); o status é exibido ao usuário.
+### 1. Fluxo do Produtor: Solicitação de Empréstimo
 
-Financiamento → Drawdown
-- O que acontece: o investidor financia total ou parcialmente uma proposta.
-- Ação: os fundos são alocados no mercado de lending (ex.: Morpho) via transação on‑chain.
-- Resultado: quando liberado, o drawdown transfere os fundos para a carteira do produtor; o Backend persiste o tx_hash e atualiza o status no banco.
+O produtor inicia o processo com **cadastro simplificado**. Ele acessa a plataforma via web/mobile e faz login com email/telefone ou Google/Apple ID. No primeiro acesso, uma **smart contract wallet é criada automaticamente nos bastidores** via Account Abstraction - o produtor não percebe isso e não precisa gerenciar chaves ou extensões. 
 
-Recebimento / Conversão
-- O que acontece: o produtor recebe cripto na carteira.
-- Ação: se precisar de reais, o produtor solicita conversão via parceiro on/off‑ramp.
-- Resultado: o parceiro realiza o payout em BRL; o Backend registra a confirmação.
+Ele preenche um formulário com documentos básicos: CPF, CNH, comprovante de propriedade rural. **Sistema de ML valida automaticamente** os documentos via OCR e computer vision, verificando autenticidade e extraindo dados. O processo leva minutos, não dias. Um **perfil de risco inicial** é calculado baseado nos dados fornecidos.
 
-Repagamento
-- O que acontece: após a venda da safra o produtor faz o repay on‑chain.
-- Ação: repay() no protocolo distribui os valores aos investidores.
-- Resultado: o evento é capturado e o Backend atualiza reembolsos e saldos; tx_hash fica armazenado para auditoria.
+Em seguida, a produção é **tokenizada de forma transparente**. O produtor deposita a soja em um dos **armazéns parceiros integrados** no Mato Grosso. O armazém emite CDA/WA digital e notifica a plataforma via API. O sistema:
+- Valida automaticamente a assinatura digital e certificação do armazém
+- **Cria NFT de colateral nos bastidores** (apresentado ao usuário como "Certificado Digital de Garantia")
+- Disponibiliza visualização dos metadados em linguagem simples: "Você tem 1.000 sacas de soja depositadas no Armazém XYZ, avaliadas em R$ XXX"
 
-Tokenização de Garantia
-- O que acontece: colheita/recibo é tokenizada (NFT/receipt).
-- Ação: o Backend pede mint do token e grava o token_uri/metadata.
-- Resultado: o token serve como garantia vinculada à proposta; o hash/URI é salvo no banco.
+O produtor então **cria a proposta de empréstimo** com interface intuitiva, definindo:
+- Valor desejado (apresentado sempre em **BRL**, conversão USDC é transparente)
+- Prazo (3-6 meses)
+- Taxa máxima aceitável (ou aceita sugestão do sistema)
 
-Armazenamento e Verificação (IPFS / KYC)
-- O que acontece: documentos e snapshots são armazenados e KYC é verificado.
-- Ação: o Backend envia documentos para storage (IPFS/S3) e requisita verificação KYC quando necessário.
-- Resultado: hashes/links e status KYC são salvos para consulta e compliance.
+O sistema calcula e exibe automaticamente:
+- **LTV** baseado no preço da soja (explicado como "% do valor da garantia")
+- **Classificação de risco** (A, B, C com explicação visual)
+- **Taxa de juros sugerida** baseada no perfil
+- **Simulações**: quanto vai pagar no total, parcelas, etc
 
-Diagrama simplificado (Mermaid)
+Quando investidores fornecem liquidez suficiente (fundado 100%), o produtor é notificado. O **dinheiro é depositado via Pix** diretamente na conta bancária dele em minutos - toda a conversão USDC e transações blockchain acontecem automaticamente nos bastidores.
 
-```mermaid
-flowchart LR
-  Produtor[Produtor] -->|cria proposta| Backend[Backend API]
-  Backend -->|salva proposta| DB[(Banco)]
-  Backend -->|registra metadata| IPFS[IPFS S3]
+### 2. Fluxo do Investidor: Fornecimento de Capital
 
-  Investidor[Investidor] -->|inicia investimento| Frontend[Frontend]
-  Frontend -->|POST /invest| Backend
-  Backend -->|aloca fundos onchain| Morpho[Pool Morpho]
-  Morpho -->|drawdown| ProdutorWallet[Carteira do Produtor]
-  ProdutorWallet -->|opcional: converte| Ramp[OnOffRamp]
-  Ramp -->|payout BRL| Produtor
+O investidor realiza **onboarding similar**: login via email/telefone, **smart contract wallet criada automaticamente**, KYC simplificado com validação ML de documentos.
 
-  ProdutorWallet -->|repay| Morpho
-  Morpho -->|distribui| InvestidorWallet[Carteira do Investidor]
-  Morpho -->|emite eventos| Indexer[Indexador]
-  Indexer -->|persiste tx_hash| DB
+Para adicionar capital, duas opções simples:
+- **Pix direto**: Investidor transfere via Pix, sistema converte para USDC automaticamente e credita na conta dele (apresentado sempre em BRL)
+- **Crypto direto**: Para investidores avançados, possibilidade de depositar USDC de outras wallets
 
-  Backend -->|mint token| Token[Token Garantia]
-  Token -->|token_uri| DB
+O investidor **navega pelas oportunidades** com filtros intuitivos:
+- Ordenar por: maior retorno, menor risco, prazo
+- Filtrar por: classificação de risco (A/B/C), retorno anual, prazo, produto produzido pelo agricultor
+- Visualizar detalhes de cada empréstimo em **linguagem de negócio tradicional**:
+  - "Produtor com bom histórico solicita R$ 100k"
+  - "Garantia: 1.000 sacas de soja (valor R$ 150k)"
+  - "Retorno: 12% ao ano"
+  - "Risco: Baixo (A)"
+  - "Margem de segurança: 50%" (LTV apresentado de forma compreensível)
 
-  style DB fill:#f2f9ff
-  style Morpho fill:#fff7f0
-```
+O investidor seleciona quanto quer investir e confirma. **Transação blockchain acontece nos bastidores** - investidor só vê "Investimento confirmado" e seu saldo sendo atualizado instantaneamente.
+
+Dashboard mostra:
+- Investimentos ativos
+- Juros acumulados (atualizados diariamente, não por bloco)
+- Status de cada empréstimo
+- Alertas em linguagem simples: "Atenção: Preço da soja caiu, margem de segurança reduzida para 30%"
+
+### 3. Fluxo de Repagamento e Liquidação
+
+No **cenário positivo de repagamento**, o produtor:
+- Acessa dashboard e vê valor total devido (principal + juros)
+- Clica em "Pagar via Pix"
+- Faz transferência Pix para conta da plataforma
+- Sistema converte para USDC automaticamente e executa repagamento via smart contract
+- Investidores recebem conta e saldo fica disponível para reinvestir ou fazer uma retirada via pix
+
+Todo o fluxo blockchain (distribuição proporcional aos investidores, burn do NFT, atualização de contratos) acontece de forma transparente. O produtor vê: "Empréstimo quitado ✓" e pode retirar a soja do armazém.
+
+No **cenário de inadimplência/liquidação**:
+
+**Monitoramento e alertas em linguagem simples**:
+- Sistema monitora "Margem de Segurança" (health factor) continuamente
+- Alertas progressivos:
+  - "Atenção: Margem caiu para 20%, considere adicionar mais garantia"
+  - "Urgente: Você tem 48h para regularizar ou a garantia será vendida"
+
+**Liquidação automatizada (nos bastidores)**:
+- Se margem chega a zero, smart contract aciona liquidação automaticamente
+- Sistema busca compradores para a garantia (via leilão on-chain)
+- **Para o investidor**: Notificação simples "Empréstimo liquidado, você recebeu R$ XXX via Pix (perda de Y%)"
+- **Para o produtor**: "Sua garantia foi vendida para cobrir a dívida"
+
+
+Esses fluxos abstraem completamente a complexidade blockchain, oferecendo experiência equivalente a fintechs como Nubank ou PicPay, enquanto mantêm todos os benefícios de transparência, auditabilidade e descentralização nos bastidores.
 
 ---
 
-## 6. Exemplo de estrutura
+## 6. Considerações de Implementação
 
-Resumo
-- Exemplos minimalistas para ilustrar a integração entre frontend, backend, indexador on‑chain e persistência (Postgres). Stack sugerido: Node.js + TypeScript (Fastify), Prisma, ethers.js, React + TypeScript + Tailwind.
+Objetivo
+- Entregar um MVP operacional que rode a lógica on‑chain (Morpho + pools dedicados) como fonte de verdade, espelhando eventos e hashes off‑chain para UI, auditoria e reconciliação.
 
-### Backend API (Node.js + TypeScript)
-O backend expõe uma API REST/HTTP e handlers para eventos on‑chain. Responsabilidades principais:
-- Endpoints: criar/listar propostas, iniciar investimento, emitir drawdown, registrar reembolsos.
-- Indexador: consome eventos (LoanCreated, Repayment) e persiste tx_hash + payload_raw.
-- Integrações: IPFS (metadata), Morpho (pool), on/off‑ramp (conversão), KYC.
-- Segurança: autenticação JWT, validação de requests e uso de vault para secrets.
+Infra & serviços recomendados
+- API: Node.js 18+ com Fastify (TypeScript) — endpoints REST + handlers para indexer/on‑chain callbacks.
+- ORM / Migrations: Prisma + migrations versionadas (Postgres).
+- DB: PostgreSQL 13+ (UUIDs, JSONB) com backups automatizados.
+- Indexador on‑chain: serviço Node.js (ethers.js) via WebSocket RPC para consumir eventos Morpho e contratos próprios; persistir tx_hash, bloco, log_index e payload_raw.
+- Cache / sessão: Redis (cache de leitura rápida e locks).
+- Storage: IPFS (Pinata) para metadata de tokens + S3 para documentos sensíveis (referenciados por hash).
+- Blockchain infra: provider RPC (Alchemy/QuickNode/Infura) com chave em Vault; considerar nó próprio se for necessário SLA.
+- Lending / Markets: Morpho (pools dedicados) integrado para funding/drawdown/repay.
+- On/Off‑ramps: parceiros (Transak, Ramp, transacoes bancárias/Pix integradas) para conversões USDC ↔ BRL.
+- Oráculos: Chainlink para preço da commodity (fallback manual via admin‑sig).
+- Secrets & keys: HashiCorp Vault / AWS KMS para chaves, RPC keys e credenciais.
+- Workers: processos assíncronos (BullMQ / simple cron workers) para reconciliação e tarefas offline leves.
 
-Principais funcionalidades:
-- POST /propostas — cria proposta e grava termos_ipfs_hash.
-- POST /investimentos — registra intenção e aciona funding on‑chain.
-- Webhook/Listener on‑chain — persiste eventos com tx_hash para auditoria.
+Integração e fluxo on‑chain ↔ off‑chain
+- On‑chain é fonte de verdade; indexador detecta eventos e persiste para o Backend reconciliar.
+- Persistir: tx_hash, bloco, log_index, confirmações, evento_tipo, payload_raw e correlation_id (quando aplicado).
+- Idempotência: dedupe por tx_hash+log_index; operações off‑chain só mudam estado após N confirmações configuráveis.
+- Reconciliar: jobs periódicos que conferem receipts on‑chain vs registros (sem dependência de filas complexas).
 
-### Frontend Dashboard (React + TypeScript)
-Interface para investidores e produtores:
-- Componentes: lista de propostas, formulário de criação de proposta, fluxo de investimento e visualização de status on‑chain.
-- Integração wallet: conectar MetaMask/WalletConnect para assinar transações on‑chain.
-- UX: mostrar status do tx (PENDENTE → CONFIRMADA) consultando records off‑chain (tx_hash) e consultas on‑chain.
+Segurança e compliance
+- Auditoria de smart contracts antes de produção; multi‑sig para ações administrativas sensíveis.
+- Proteção PII: criptografia em repouso, acesso por roles, consentimento e políticas LGPD.
+- KYC/AML: integração com provedores (armazenamento encriptado dos resultados).
+- Custódia & chaves: HSM para chaves de custódia (se houver retenção de fundos) e Vault para secrets.
+- Hardening: CSP, validação/sanitização de input, rate limiting e verificação de endereço de contrato nas events.
 
-Componentes principais:
-- ProposalList, ProposalForm, InvestModal, LoanStatusCard.
+Operação prática
+- Deploy: frontend em Vercel, backend em Railway/Render/Docker+K8s conforme escala; migrations executadas via pipelines CI.
+- Backups: dumps incrementais do Postgres e snapshot periódicos do S3/IPFS pin list.
+- Observabilidade mínima operacional: logs estruturados e traces básicos para depuração de falhas de indexação (sem seção de monitoramento avançado).
+- Runbooks e testes formais não fazem parte do escopo inicial (MVP).
 
-### Estrutura do Banco de Dados (Postgres) — características
-- UUIDs para PKs; JSONB para raw events e metadados.
-- Indices em tx_hash, proposta_id, emprestimo_id.
-- Tabelas relevantes: propostas, emprestimos, reembolsos, transacoes, eventos_onchain, garantias_token, pontuacoes.
-- Boas práticas: constraints, FK, e jobs de reconciliação on‑chain ↔ off‑chain.
+Dados e modelagem
+- Armazenar raw_event_json para auditoria e possibilitar reconstrução de estado.
+- Campos adicionais sugeridos: emprestimos.morpho_tx_hash, emprestimos.morpho_contract_address, reembolsos.status_confirmado BOOLEAN, eventos_onchain(payload_raw JSONB).
+- Garantir índices em tx_hash, proposta_id e emprestimo_id para queries de reconciliação.
 
+Boas práticas operacionais
+- Confirmar N blocos antes de marcar operações irreversíveis.
+- Passar correlation_id nas transações on‑chain quando possível para ligar facilmente off‑chain → on‑chain.
+- Design idempotente para listeners e endpoints (retries seguros).
+- Testar flows em testnet (Goerli/Polygon Mumbai) antes de mainnet.
 
-### Exemplo de fluxo completo (simplificado)
-1. Investidor clica em "Investir" no dashboard → Frontend POST /investimentos → Backend cria registro e aciona transação on‑chain (via ethers.js).
-2. Transação on‑chain é emitida em Morpho → Indexador captura LoanCreated com tx_hash e persiste em eventos_onchain.
-3. Backend atualiza EMPRESTIMOS com morpho_tx_hash → UI exibe status com link para explorer.
-4. Quando produtor repay(), Indexador captura Repayment → Backend marca REEMBOLSOS e atualiza saldos dos investidores.
+KPIs sugeridos (MVP)
+- Produtores cadastrados / investidores ativos
+- Volume financiado por mês (BRL)
+- % loans em default por coorte
+- Latência média de funding → drawdown (tempo entre funding on‑chain e drawdown)
+- Tempo médio de reconciliação on‑chain → off‑chain (até persistir tx_hash)
 
-Segurança e operação
-- Validar origem dos eventos on‑chain (address do contrato).
-- Trabalhar com N confirmações antes de considerar a operação finalizada.
-- Rastrear raw_event_json para auditoria.
+Próximos passos técnicos
+1. Gerar schema Prisma e migração inicial (include campos on‑chain sugeridos).  
+2. Criar indexador básico (ethers.js) que persista eventos_onchain e atualize EMPRESTIMOS/REEMBOLSOS.  
+3. Implementar endpoints mínimos do backend (Fastify + Prisma) para criar propostas, iniciar investimentos e consultar status por tx_hash.  
+4. Integrar on/off‑ramp partner em sandbox para validar fluxo Pix ↔ USDC.
 
-
-## 7. Considerações de Implementação
-
-**Infra & serviços**:
-- API: Node.js 18+ (Fastify/Express)
-- DB: PostgreSQL 13+
-- Storage: IPFS/S3
-- Blockchain: Rede EVM (Polygon/Gnosis)
-- Oráculos: Chainlink ou custom
-- CI/CD: GitHub Actions
-
-**Segurança & compliance**:
-- Auditoria de smart contracts
-- Vault para segredos
-- KYC e verificação documental (INCRA/Receita onde possível)
-
-
-**KPIs sugeridos**
-- Produtores cadastrados e investidores ativos
-- Volume financiado por mês
-- % loans em default
-- Latência de funding/drawdown
 
 ---
 

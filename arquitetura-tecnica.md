@@ -93,7 +93,7 @@ Para adicionar capital, duas opções simples:
 
 O investidor **navega pelas oportunidades** com filtros intuitivos:
 - Ordenar por: maior retorno, menor risco, prazo
-- Filtrar por: classificação de risco (A/B/C), retorno anual, prazo
+- Filtrar por: classificação de risco (A/B/C), retorno anual, prazo, produto produzido pelo agricultor
 - Visualizar detalhes de cada empréstimo em **linguagem de negócio tradicional**:
   - "Produtor com bom histórico solicita R$ 100k"
   - "Garantia: 1.000 sacas de soja (valor R$ 150k)"
@@ -116,7 +116,7 @@ No **cenário positivo de repagamento**, o produtor:
 - Clica em "Pagar via Pix"
 - Faz transferência Pix para conta da plataforma
 - Sistema converte para USDC automaticamente e executa repagamento via smart contract
-- **Investidores recebem via Pix automaticamente** na conta cadastrada ou saldo fica disponível para reinvestir
+- Investidores recebem conta e saldo fica disponível para reinvestir ou fazer uma retirada via pix
 
 Todo o fluxo blockchain (distribuição proporcional aos investidores, burn do NFT, atualização de contratos) acontece de forma transparente. O produtor vê: "Empréstimo quitado ✓" e pode retirar a soja do armazém.
 
@@ -134,10 +134,6 @@ No **cenário de inadimplência/liquidação**:
 - **Para o investidor**: Notificação simples "Empréstimo liquidado, você recebeu R$ XXX via Pix (perda de Y%)"
 - **Para o produtor**: "Sua garantia foi vendida para cobrir a dívida"
 
-**Limites e Salvaguardas:**
-- Circuit breaker automático se muitas liquidações simultâneas
-- Multi-sig para emergências (apresentado como "Comitê de Segurança")
-- Fundo de reserva para cobrir gaps
 
 Esses fluxos abstraem completamente a complexidade blockchain, oferecendo experiência equivalente a fintechs como Nubank ou PicPay, enquanto mantêm todos os benefícios de transparência, auditabilidade e descentralização nos bastidores.
 
