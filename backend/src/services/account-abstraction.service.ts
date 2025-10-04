@@ -52,7 +52,7 @@ export interface SmartAccountDetails {
 @Injectable()
 export class AccountAbstractionService {
   private provider: ethers.Provider;
-  private JWT_SECRET = process.env.JWT_SECRET || 'hackathon_qi_tech_secret_2025';
+  private JWT_SECRET = process.env.JWT_SECRET || 'agrofi-super-secret-key-2025';
   
   // Simulando banco de dados em memória (em produção, usar DB real)
   private users: Map<string, UserProfile> = new Map();
@@ -276,20 +276,48 @@ export class AccountAbstractionService {
 
   // 🔍 Buscar usuário por ID
   async getUserById(userId: string): Promise<UserProfile> {
+    console.log('🔍 Buscando usuário:', userId);
+    console.log('👥 Total de usuários no sistema:', this.users.size);
+    console.log('🗂️ IDs disponíveis:', Array.from(this.users.keys()).slice(0, 5)); // Mostrar apenas os primeiros 5
+    
     const user = this.users.get(userId);
     if (!user) {
+      console.log('❌ Usuário não encontrado no Map!');
+      console.log('🔎 Procurando em:', userId);
+      console.log('📋 Primeiro usuário no Map:', Array.from(this.users.entries())[0]);
       throw new Error('Usuário não encontrado');
     }
+    
+    console.log('✅ Usuário encontrado:', {
+      id: user.id,
+      email: user.email,
+      smartAccount: user.smartAccountAddress
+    });
+    
     return user;
   }
 
   // 🎫 Extrair usuário do token JWT
   async getUserFromToken(token: string): Promise<UserProfile> {
     try {
+      console.log('🎫 Decodificando token JWT...');
       const decoded = jwt.verify(token, this.JWT_SECRET) as any;
+      console.log('✅ Token decodificado:', {
+        userId: decoded.userId,
+        email: decoded.email,
+        userType: decoded.userType
+      });
+      
       const user = await this.getUserById(decoded.userId);
+      console.log('👤 Usuário encontrado via token:', {
+        id: user.id,
+        email: user.email,
+        userType: user.userType
+      });
+      
       return user;
     } catch (error) {
+      console.error('❌ Erro ao processar token:', error);
       throw new Error('Token inválido ou expirado');
     }
   }

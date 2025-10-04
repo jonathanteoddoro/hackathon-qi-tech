@@ -1,169 +1,356 @@
-import { Controller, Get, Post, Body, Headers } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Headers, Logger, HttpException, HttpStatus } from '@nestjs/common';
 import { MarketplaceService } from '../services/marketplace.service';
 import type { CreateLoanRequestDto, InvestInLoanDto } from '../services/marketplace.service';
 
-@Controller('api/marketplace')
+@Controller('marketplace')
 export class MarketplaceController {
+  private readonly logger = new Logger(MarketplaceController.name);
+
   constructor(private readonly marketplaceService: MarketplaceService) {}
 
-  // 📋 Listar todas as solicitações de empréstimo
   @Get('loans')
   async getAllLoans() {
     try {
+      this.logger.log('📋 Buscando todos os empréstimos');
       const loans = await this.marketplaceService.getAllLoanRequests();
+
       return {
         success: true,
         data: loans,
-        message: 'Empréstimos carregados com sucesso'
-      };
-    } catch (error) {
-      return {
-        success: false,
-        message: error instanceof Error ? error.message : 'Erro ao carregar empréstimos',
+        message: 'Empréstimos carregados com sucesso',
         timestamp: new Date().toISOString()
       };
+    } catch (error: any) {
+      this.logger.error('Erro ao buscar empréstimos:', error);
+      throw new HttpException(
+        {
+          success: false,
+          message: error.message || 'Erro interno do servidor',
+          timestamp: new Date().toISOString()
+        },
+        HttpStatus.INTERNAL_SERVER_ERROR
+      );
     }
   }
 
-  // ➕ Criar nova solicitação de empréstimo
-  @Post('loans')
-  async createLoan(@Body() createLoanDto: CreateLoanRequestDto, @Headers('authorization') authHeader: string) {
+  @Get('loans/:id')
+  async getLoanById(@Param('id') loanId: string) {
     try {
-      if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        throw new Error('Token de autorização necessário');
+      this.logger.log(`🔍 Buscando empréstimo: ${loanId}`);
+      const loan = await this.marketplaceService.getLoanById(loanId);
+
+      if (!loan) {
+        throw new HttpException(
+          {
+            success: false,
+            message: 'Empréstimo não encontrado',
+            timestamp: new Date().toISOString()
+          },
+          HttpStatus.NOT_FOUND
+        );
       }
 
-      const token = authHeader.substring(7);
-      const loanData = { ...createLoanDto, producerToken: token };
-      
-      const loan = await this.marketplaceService.createLoanRequest(loanData);
-      
       return {
         success: true,
         data: loan,
-        message: 'Solicitação de empréstimo criada com sucesso'
-      };
-    } catch (error) {
-      return {
-        success: false,
-        message: error instanceof Error ? error.message : 'Erro ao criar solicitação',
+        message: 'Empréstimo encontrado',
         timestamp: new Date().toISOString()
       };
+    } catch (error: any) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      this.logger.error('Erro ao buscar empréstimo:', error);
+      throw new HttpException(
+        {
+          success: false,
+          message: error.message || 'Erro interno do servidor',
+          timestamp: new Date().toISOString()
+        },
+        HttpStatus.INTERNAL_SERVER_ERROR
+      );
     }
   }
 
-  // 💰 Investir em empréstimo (transação real na blockchain)
-  @Post('invest')
-  async investInLoan(@Body() investDto: InvestInLoanDto, @Headers('authorization') authHeader: string) {
+  @Post('loans')
+  async createLoan(@Body() createLoanDto: CreateLoanRequestDto) {
     try {
-      if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        throw new Error('Token de autorização necessário');
-      }
+      this.logger.log('📝 Criando novo empréstimo');
 
-      const token = authHeader.substring(7);
-      const investmentData = { ...investDto, investorToken: token };
-      
-      console.log('🚀 Processando investimento:', {
-        loanId: investDto.loanId,
-        amount: investDto.investmentAmount,
-        timestamp: new Date().toISOString()
-      });
-
-      const result = await this.marketplaceService.investInLoan(investmentData);
-      
-      if (result.success) {
-        return {
-          success: true,
-          data: {
-            transactionHash: result.transactionHash,
-            updatedLoan: result.updatedLoan
+      if (!createLoanDto.producerToken) {
+        throw new HttpException(
+          {
+            success: false,
+            message: 'Token do produtor é obrigatório',
+            timestamp: new Date().toISOString()
           },
-          message: 'Investimento realizado com sucesso! Transação enviada para a blockchain.'
-        };
-      } else {
-        throw new Error(result.error);
+          HttpStatus.BAD_REQUEST
+        );
       }
-    } catch (error) {
-      console.error('❌ Erro no investimento:', error);
+
+      const loan = await this.marketplaceService.createLoanRequest(createLoanDto);
+
       return {
-        success: false,
-        message: error instanceof Error ? error.message : 'Erro ao processar investimento',
+        success: true,
+        data: loan,
+        message: 'Empréstimo criado com sucesso',
         timestamp: new Date().toISOString()
       };
+    } catch (error: any) {
+      this.logger.error('Erro ao criar empréstimo:', error);
+      throw new HttpException(
+        {
+          success: false,
+          message: error.message || 'Erro interno do servidor',
+          timestamp: new Date().toISOString()
+        },
+        HttpStatus.BAD_REQUEST
+      );
     }
   }
 
-  // 📊 Buscar empréstimos de um produtor
-  @Get('my-loans')
-  async getMyLoans(@Headers('authorization') authHeader: string) {
+  @Post('loans/:id/invest')
+  async investInLoan(
+    @Param('id') loanId: string,
+    @Body() investDto: Omit<InvestInLoanDto, 'loanId'>,
+    @Headers('authorization') authHeader?: string
+  ) {
     try {
+      this.logger.log(`💰 Processando investimento no empréstimo: ${loanId}`);
+
       if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        throw new Error('Token de autorização necessário');
+        throw new HttpException(
+          {
+            success: false,
+            message: 'Token de autorização necessário',
+            timestamp: new Date().toISOString()
+          },
+          HttpStatus.UNAUTHORIZED
+        );
       }
 
       const token = authHeader.substring(7);
-      
-      // Extrair userId do token para buscar empréstimos
-      const user = await this.marketplaceService['aaService'].getUserFromToken(token);
-      const loans = await this.marketplaceService.getProducerLoans(user.id);
-      
+      const investData: InvestInLoanDto = {
+        ...investDto,
+        loanId,
+        investorToken: token
+      };
+
+      const result = await this.marketplaceService.investInLoan(investData);
+
+      if (!result.success) {
+        throw new HttpException(
+          {
+            success: false,
+            message: result.error,
+            timestamp: new Date().toISOString()
+          },
+          HttpStatus.BAD_REQUEST
+        );
+      }
+
+      return {
+        success: true,
+        data: {
+          transactionHash: result.transactionHash,
+          updatedLoan: result.updatedLoan
+        },
+        message: 'Investimento realizado com sucesso',
+        timestamp: new Date().toISOString()
+      };
+    } catch (error: any) {
+      if (error instanceof HttpException) {
+        throw error;
+      }
+
+      this.logger.error('Erro no investimento:', error);
+      throw new HttpException(
+        {
+          success: false,
+          message: error.message || 'Erro interno do servidor',
+          timestamp: new Date().toISOString()
+        },
+        HttpStatus.INTERNAL_SERVER_ERROR
+      );
+    }
+  }
+
+  @Get('my-loans')
+  async getMyLoans(@Headers('authorization') authHeader?: string) {
+    try {
+      this.logger.log('📋 Buscando empréstimos do produtor');
+
+      if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        throw new HttpException(
+          {
+            success: false,
+            message: 'Token de autorização necessário',
+            timestamp: new Date().toISOString()
+          },
+          HttpStatus.UNAUTHORIZED
+        );
+      }
+
+      const token = authHeader.substring(7);
+      const loans = await this.marketplaceService.getMyLoans(token);
+
       return {
         success: true,
         data: loans,
-        message: 'Empréstimos do produtor carregados'
-      };
-    } catch (error) {
-      return {
-        success: false,
-        message: error instanceof Error ? error.message : 'Erro ao carregar empréstimos',
+        message: 'Empréstimos do produtor carregados',
         timestamp: new Date().toISOString()
       };
+    } catch (error: any) {
+      this.logger.error('Erro ao buscar empréstimos do produtor:', error);
+      throw new HttpException(
+        {
+          success: false,
+          message: error.message || 'Erro interno do servidor',
+          timestamp: new Date().toISOString()
+        },
+        HttpStatus.INTERNAL_SERVER_ERROR
+      );
     }
   }
 
-  // 📈 Buscar investimentos de um investidor
   @Get('my-investments')
-  async getMyInvestments(@Headers('authorization') authHeader: string) {
+  async getMyInvestments(@Headers('authorization') authHeader?: string) {
     try {
+      this.logger.log('💼 Buscando investimentos do usuário');
+
       if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        throw new Error('Token de autorização necessário');
+        throw new HttpException(
+          {
+            success: false,
+            message: 'Token de autorização necessário',
+            timestamp: new Date().toISOString()
+          },
+          HttpStatus.UNAUTHORIZED
+        );
       }
 
       const token = authHeader.substring(7);
-      
-      // Extrair userId do token para buscar investimentos
-      const user = await this.marketplaceService['aaService'].getUserFromToken(token);
-      const investments = await this.marketplaceService.getInvestorInvestments(user.id);
-      
+      const investments = await this.marketplaceService.getMyInvestments(token);
+
       return {
         success: true,
         data: investments,
-        message: 'Investimentos carregados'
-      };
-    } catch (error) {
-      return {
-        success: false,
-        message: error instanceof Error ? error.message : 'Erro ao carregar investimentos',
+        message: 'Investimentos carregados',
         timestamp: new Date().toISOString()
       };
+    } catch (error: any) {
+      this.logger.error('Erro ao buscar investimentos:', error);
+      throw new HttpException(
+        {
+          success: false,
+          message: error.message || 'Erro interno do servidor',
+          timestamp: new Date().toISOString()
+        },
+        HttpStatus.INTERNAL_SERVER_ERROR
+      );
     }
   }
 
-  // 🔍 Buscar empréstimo específico
-  @Get('loans/:id')
-  async getLoanById(@Headers('authorization') authHeader: string) {
+  @Get('stats')
+  async getMarketplaceStats() {
     try {
-      // TODO: Implementar busca por ID específico
+      this.logger.log('📊 Buscando estatísticas do marketplace');
+      const stats = await this.marketplaceService.getMarketplaceStats();
+
       return {
-        success: false,
-        message: 'Endpoint em desenvolvimento'
-      };
-    } catch (error) {
-      return {
-        success: false,
-        message: error instanceof Error ? error.message : 'Erro ao buscar empréstimo',
+        success: true,
+        data: stats,
+        message: 'Estatísticas carregadas',
         timestamp: new Date().toISOString()
       };
+    } catch (error: any) {
+      this.logger.error('Erro ao buscar estatísticas:', error);
+      throw new HttpException(
+        {
+          success: false,
+          message: error.message || 'Erro interno do servidor',
+          timestamp: new Date().toISOString()
+        },
+        HttpStatus.INTERNAL_SERVER_ERROR
+      );
+    }
+  }
+
+  @Get('loans/:id/position')
+  async getLoanPosition(
+    @Param('id') loanId: string,
+    @Headers('authorization') authHeader?: string
+  ) {
+    try {
+      this.logger.log(`🔍 Buscando posição no empréstimo: ${loanId}`);
+
+      if (!loanId || loanId === 'undefined') {
+        throw new HttpException(
+          {
+            success: false,
+            message: 'ID do empréstimo é obrigatório',
+            timestamp: new Date().toISOString()
+          },
+          HttpStatus.BAD_REQUEST
+        );
+      }
+
+      if (!authHeader || !authHeader.startsWith('Bearer ')) {
+        throw new HttpException(
+          {
+            success: false,
+            message: 'Token de autorização necessário',
+            timestamp: new Date().toISOString()
+          },
+          HttpStatus.UNAUTHORIZED
+        );
+      }
+
+      const token = authHeader.substring(7);
+      const position = await this.marketplaceService.getP2PPosition(loanId, token);
+
+      return {
+        success: true,
+        data: position,
+        message: 'Posição no empréstimo',
+        timestamp: new Date().toISOString()
+      };
+    } catch (error: any) {
+      this.logger.error('Erro ao buscar posição:', error);
+      throw new HttpException(
+        {
+          success: false,
+          message: error.message || 'Erro interno do servidor',
+          timestamp: new Date().toISOString()
+        },
+        HttpStatus.INTERNAL_SERVER_ERROR
+      );
+    }
+  }
+
+  @Get('config')
+  async getMorphoConfig() {
+    try {
+      this.logger.log('⚙️ Buscando configurações do Morpho');
+      const config = await this.marketplaceService.getMorphoConfig();
+
+      return {
+        success: true,
+        data: config,
+        message: 'Configurações do Morpho carregadas',
+        timestamp: new Date().toISOString()
+      };
+    } catch (error: any) {
+      this.logger.error('Erro ao buscar configurações:', error);
+      throw new HttpException(
+        {
+          success: false,
+          message: error.message || 'Erro interno do servidor',
+          timestamp: new Date().toISOString()
+        },
+        HttpStatus.INTERNAL_SERVER_ERROR
+      );
     }
   }
 }

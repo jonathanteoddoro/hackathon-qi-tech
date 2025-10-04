@@ -103,11 +103,6 @@ export default function AgroFiMarketplace() {
   
   // Usar o tipo de usuário da autenticação se disponível, senão padrão para investidor
   const userType = user?.userType || 'investor';
-  
-  // Debug temporário
-  console.log('🐛 Debug userType:', userType);
-  console.log('🐛 Debug user:', user);
-  console.log('🐛 Debug token:', token);
 
   // Carregar empréstimos ao montar o componente
   useEffect(() => {
@@ -255,10 +250,8 @@ export default function AgroFiMarketplace() {
   const handleCreateLoan = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    console.log('🐛 Debug handleCreateLoan:', { token, userType, user });
-    
     if (!token || userType !== 'producer') {
-      alert(`❌ Apenas produtores autenticados podem criar empréstimos. Seu tipo: ${userType}`);
+      alert('Apenas produtores autenticados podem criar empréstimos');
       return;
     }
 
@@ -283,6 +276,36 @@ export default function AgroFiMarketplace() {
     } catch (err) {
       console.error('❌ Erro ao criar empréstimo:', err);
       alert(`Erro ao criar empréstimo: ${err instanceof Error ? err.message : 'Erro desconhecido'}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleRepayLoan = async (loanId: string) => {
+    if (!token || userType !== 'producer') {
+      alert('Apenas produtores autenticados podem quitar empréstimos');
+      return;
+    }
+
+    const confirmRepay = confirm('🏦 Deseja quitar este empréstimo? Esta ação não pode ser desfeita.');
+    if (!confirmRepay) return;
+
+    try {
+      setLoading(true);
+      
+      // Simular quitação do empréstimo (em produção seria uma chamada à API)
+      console.log(`🏦 Quitando empréstimo ${loanId}...`);
+      await new Promise(resolve => setTimeout(resolve, 2000)); // Simular delay da blockchain
+      
+      alert('✅ Empréstimo quitado com sucesso! O colateral foi liberado.');
+      
+      // Recarregar dados
+      await loadLoans();
+      await loadUserData();
+      
+    } catch (err) {
+      console.error('❌ Erro ao quitar empréstimo:', err);
+      alert(`Erro ao quitar empréstimo: ${err instanceof Error ? err.message : 'Erro desconhecido'}`);
     } finally {
       setLoading(false);
     }
@@ -569,6 +592,29 @@ export default function AgroFiMarketplace() {
                         {loan.status === 'funded' ? 'Financiado' : 'Investir'}
                         <ChevronRight className="h-4 w-4 ml-1" />
                       </Button>
+                    )}
+                    
+                    {/* Repayment Button for Producer's own loans */}
+                    {userType === 'producer' && user?.profile && 'name' in user.profile && user.profile.name === loan.producer.name && loan.status === 'funded' && (
+                      <Button 
+                        className="w-full bg-green-600 hover:bg-green-700" 
+                        onClick={() => handleRepayLoan(loan.id)}
+                      >
+                        💰 Quitar Empréstimo
+                        <ChevronRight className="h-4 w-4 ml-1" />
+                      </Button>
+                    )}
+                    
+                    {/* Info for producer's own loans */}
+                    {userType === 'producer' && user?.profile && 'name' in user.profile && user.profile.name === loan.producer.name && (
+                      <div className="w-full p-3 bg-blue-50 rounded-lg">
+                        <p className="text-sm text-blue-700 font-medium">📋 Seu Empréstimo</p>
+                        <p className="text-xs text-blue-600">
+                          {loan.status === 'funding' ? 'Aguardando financiamento' : 
+                           loan.status === 'funded' ? 'Disponível para quitação' : 
+                           'Finalizado'}
+                        </p>
+                      </div>
                     )}
                   </CardContent>
                 </Card>
@@ -880,44 +926,47 @@ export default function AgroFiMarketplace() {
 
           {/* Dashboard Tab */}
           <TabsContent value="dashboard" className="mt-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Wallet className="h-5 w-5" />
-                    Minha Carteira
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div>
-                      <p className="text-sm text-gray-600">Saldo Total</p>
-                      <p className="text-3xl font-bold">
-                        {formatCurrency(myInvestments.reduce((sum, inv) => sum + inv.amount, 0) + 12780)}
-                      </p>
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <p className="text-sm text-gray-600">Investido P2P</p>
-                        <p className="text-lg font-semibold text-blue-600">
-                          {formatCurrency(myInvestments.reduce((sum, inv) => sum + inv.amount, 0))}
-                        </p>
+            {userType === 'investor' ? (
+              // Dashboard do Investidor
+              <div className="space-y-6">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Wallet className="h-5 w-5" />
+                        Minha Carteira - Investidor
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-4">
+                        <div>
+                          <p className="text-sm text-gray-600">Saldo Total</p>
+                          <p className="text-3xl font-bold">
+                            {formatCurrency(myInvestments.reduce((sum, inv) => sum + inv.amount, 0) + 12780)}
+                          </p>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <p className="text-sm text-gray-600">Investido P2P</p>
+                            <p className="text-lg font-semibold text-blue-600">
+                              {formatCurrency(myInvestments.reduce((sum, inv) => sum + inv.amount, 0))}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-sm text-gray-600">Disponível</p>
+                            <p className="text-lg font-semibold text-green-600">R$ 12.780,00</p>
+                          </div>
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-sm text-gray-600">Disponível</p>
-                        <p className="text-lg font-semibold text-green-600">R$ 12.780,00</p>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+                    </CardContent>
+                  </Card>
 
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <TrendingUp className="h-5 w-5" />
-                    Performance P2P
-                  </CardTitle>
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <TrendingUp className="h-5 w-5" />
+                        Performance P2P
+                      </CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
@@ -988,6 +1037,21 @@ export default function AgroFiMarketplace() {
                   </div>
                 </CardContent>
               </Card>
+            )}
+                </div>
+              </div>
+            ) : (
+              // Dashboard do Produtor - Placeholder
+              <div className="space-y-6">
+                <Card>
+                  <CardContent className="p-6">
+                    <div className="text-center">
+                      <h3 className="text-lg font-semibold mb-2">Dashboard do Produtor</h3>
+                      <p className="text-gray-600">Área específica para produtores em desenvolvimento.</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
             )}
           </TabsContent>
 

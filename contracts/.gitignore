@@ -1,0 +1,21 @@
+# ================================
+# SMART CONTRACTS SPECIFIC (Hardhat)
+# ================================
+
+# Hardhat build artifacts
+artifacts/
+cache/
+
+# TypeChain generated types
+typechain/
+typechain-types/
+
+# OpenZeppelin upgrades
+.openzeppelin/
+
+# Hardhat specific
+.hardhat/
+
+# Contract deployment logs
+deployments/localhost/
+deployments/hardhat/

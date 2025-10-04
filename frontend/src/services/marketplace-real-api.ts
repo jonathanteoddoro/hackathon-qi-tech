@@ -49,19 +49,82 @@ export interface Investment {
   producerName: string;
 }
 
-const API_BASE_URL = 'http://localhost:3001/api';
+export interface P2PPosition {
+  loanId: string;
+  borrower: string;
+  lender: string;
+  principal: string;
+  collateral: string;
+  interestAccrued: string;
+  healthFactor: string;
+  status: 'ACTIVE' | 'LIQUIDATED' | 'REPAID';
+  maturityDate: string;
+  transactionHash?: string;
+  morphoMarketId?: string;
+}
+
+export interface P2PStats {
+  totalLent: number;
+  totalBorrowed: number;
+  activeLendingPositions: number;
+  activeBorrowingPositions: number;
+  averageHealthFactor: number;
+  totalInterestEarned: number;
+}
+
+const API_BASE_URL = 'http://localhost:3001';
 
 class MarketplaceAPI {
   private getHeaders(token?: string): HeadersInit {
     const headers: HeadersInit = {
       'Content-Type': 'application/json',
     };
-    
+
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;
     }
-    
+
     return headers;
+  }
+
+  // Interceptor para tratar erros de JWT
+  private async handleResponse(response: Response): Promise<any> {
+    if (!response.ok) {
+      const errorText = await response.text();
+
+      // Verificar se é erro de JWT
+      if (response.status === 401 ||
+          errorText.includes('TOKEN_INVALID_SIGNATURE') ||
+          errorText.includes('TOKEN_EXPIRED') ||
+          errorText.includes('TOKEN_VALIDATION_ERROR') ||
+          errorText.includes('Token inválido')) {
+
+        console.warn('🔑 Token inválido detectado, forçando logout imediato...');
+
+        // Limpar todos os tokens
+        localStorage.removeItem('agrofi_token');
+        sessionStorage.removeItem('agrofi_token');
+        localStorage.removeItem('agrofi_user');
+
+        // Mostrar alerta e redirecionar
+        alert('Token inválido detectado. Você será redirecionado para fazer login novamente.');
+
+        // Redirecionar para página inicial (limpa estado)
+        window.location.href = window.location.origin;
+
+        // Nunca chegará aqui, mas por segurança
+        throw new Error('Token inválido. Redirecionando...');
+      }
+
+      throw new Error(errorText || 'Erro na requisição');
+    }
+
+    const result = await response.json();
+    if (!result.success) {
+      throw new Error(result.message || 'Erro na resposta da API');
+    }
+
+    return result;
   }
 
   async getAllLoans(): Promise<LoanRequest[]> {
@@ -70,14 +133,7 @@ class MarketplaceAPI {
       headers: this.getHeaders(),
     });
 
-    if (!response.ok) {
-      throw new Error('Erro ao carregar empréstimos');
-    }
-
-    const result = await response.json();
-    if (!result.success) {
-      throw new Error(result.message || 'Erro ao carregar empréstimos');
-    }
+    const result = await this.handleResponse(response);
 
     // Mapear dados para incluir campos calculados
     return result.data.map((loan: any) => ({
@@ -91,8 +147,11 @@ class MarketplaceAPI {
   async createLoan(data: CreateLoanRequest, token: string): Promise<LoanRequest> {
     const response = await fetch(`${API_BASE_URL}/marketplace/loans`, {
       method: 'POST',
-      headers: this.getHeaders(token),
-      body: JSON.stringify(data),
+      headers: this.getHeaders(),
+      body: JSON.stringify({
+        ...data,
+        producerToken: token
+      }),
     });
 
     if (!response.ok) {
@@ -112,10 +171,12 @@ class MarketplaceAPI {
     transactionHash: string;
     updatedLoan: LoanRequest;
   }> {
-    const response = await fetch(`${API_BASE_URL}/marketplace/invest`, {
+    const response = await fetch(`${API_BASE_URL}/marketplace/loans/${data.loanId}/invest`, {
       method: 'POST',
       headers: this.getHeaders(token),
-      body: JSON.stringify(data),
+      body: JSON.stringify({
+        investmentAmount: data.investmentAmount
+      }),
     });
 
     if (!response.ok) {
@@ -128,7 +189,10 @@ class MarketplaceAPI {
       throw new Error(result.message || 'Erro ao processar investimento');
     }
 
-    return result.data;
+    return {
+      transactionHash: result.data.transactionHash,
+      updatedLoan: result.data.updatedLoan
+    };
   }
 
   async getMyLoans(token: string): Promise<LoanRequest[]> {
@@ -137,15 +201,7 @@ class MarketplaceAPI {
       headers: this.getHeaders(token),
     });
 
-    if (!response.ok) {
-      throw new Error('Erro ao carregar meus empréstimos');
-    }
-
-    const result = await response.json();
-    if (!result.success) {
-      throw new Error(result.message || 'Erro ao carregar empréstimos');
-    }
-
+    const result = await this.handleResponse(response);
     return result.data;
   }
 
@@ -155,13 +211,60 @@ class MarketplaceAPI {
       headers: this.getHeaders(token),
     });
 
+    const result = await this.handleResponse(response);
+    return result.data;
+  }
+
+  async getP2PPosition(loanId: string, token: string): Promise<P2PPosition> {
+    const response = await fetch(`${API_BASE_URL}/marketplace/loans/${loanId}/position`, {
+      method: 'GET',
+      headers: this.getHeaders(token),
+    });
+
+    const result = await this.handleResponse(response);
+    return result.data;
+  }
+
+  async getMorphoConfig(): Promise<{
+    markets: string[];
+    supportedCollaterals: string[];
+    currentRates: Record<string, number>;
+  }> {
+    const response = await fetch(`${API_BASE_URL}/marketplace/config`, {
+      method: 'GET',
+      headers: this.getHeaders(),
+    });
+
     if (!response.ok) {
-      throw new Error('Erro ao carregar meus investimentos');
+      throw new Error('Erro ao carregar configurações do Morpho');
     }
 
     const result = await response.json();
     if (!result.success) {
-      throw new Error(result.message || 'Erro ao carregar investimentos');
+      throw new Error(result.message || 'Erro ao carregar configurações');
+    }
+
+    return result.data;
+  }
+
+  async getMarketplaceStats(): Promise<{
+    totalLoans: number;
+    totalFunding: number;
+    averageInterestRate: number;
+    activeLoans: number;
+  }> {
+    const response = await fetch(`${API_BASE_URL}/marketplace/stats`, {
+      method: 'GET',
+      headers: this.getHeaders(),
+    });
+
+    if (!response.ok) {
+      throw new Error('Erro ao carregar estatísticas do marketplace');
+    }
+
+    const result = await response.json();
+    if (!result.success) {
+      throw new Error(result.message || 'Erro ao carregar estatísticas');
     }
 
     return result.data;

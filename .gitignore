@@ -1,0 +1,120 @@
+# ================================
+# ROOT GITIGNORE - Hackathon QI Tech
+# ================================
+
+# ================================
+# NODE.JS / NPM
+# ================================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# ================================
+# BUILD OUTPUTS
+# ================================
+dist/
+build/
+out/
+.next/
+.nuxt/
+.vuepress/dist/
+.serverless/
+
+# ================================
+# ENVIRONMENT & CONFIG
+# ================================
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env.*.local
+
+# ================================
+# DATABASE & DOCKER
+# ================================
+*.db
+*.sqlite
+*.sqlite3
+docker-compose.override.yml
+
+# ================================
+# BLOCKCHAIN & SMART CONTRACTS
+# ================================
+contracts/artifacts/
+contracts/cache/
+contracts/typechain/
+contracts/typechain-types/
+.openzeppelin/
+
+# ================================
+# LOGS
+# ================================
+logs/
+*.log
+server.log
+debug.log
+error.log
+
+# ================================
+# TEMPORARY & CACHE
+# ================================
+.temp/
+.tmp/
+.cache/
+.parcel-cache/
+.nyc_output/
+coverage/
+
+# ================================
+# OS SPECIFIC
+# ================================
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# ================================
+# IDEs & EDITORS
+# ================================
+.vscode/
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+.idea/
+*.swp
+*.swo
+*.sublime-workspace
+*.sublime-project
+
+# ================================
+# RUNTIME & PROCESS
+# ================================
+pids/
+*.pid
+*.seed
+*.pid.lock
+
+# ================================
+# PROJECT SPECIFIC
+# ================================
+# Arquivos de debug personalizados
+debug-*.sh
+teste-*.sh
+server.log
+
+# PDFs de entrega (manter apenas versão final)
+entrega*.pdf
+
+# Arquivos temporários do hackathon
+.claude/

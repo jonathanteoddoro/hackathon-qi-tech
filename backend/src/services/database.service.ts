@@ -180,4 +180,22 @@ export class DatabaseService {
 
     return user;
   }
+
+  // Debug methods
+  async getTableCounts() {
+    const userCount = await this.userRepository.count();
+    const proposalCount = await this.proposalRepository.count();
+    const investmentCount = await this.investmentRepository.count();
+    
+    return {
+      users: userCount,
+      proposals: proposalCount,
+      investments: investmentCount
+    };
+  }
+
+  async getAllUsers() {
+    return this.userRepository.find();
+  }
+
 }

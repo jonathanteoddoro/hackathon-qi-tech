@@ -19,6 +19,33 @@ interface AuthProviderProps {
   children: ReactNode;
 }
 
+// Função para validar e normalizar dados do usuário
+function validateAndNormalizeUser(userData: any): User | null {
+  if (!userData || typeof userData !== 'object') {
+    return null;
+  }
+
+  // Verificar propriedades obrigatórias
+  const requiredFields = ['id', 'email', 'userType', 'smartAccountAddress'];
+  for (const field of requiredFields) {
+    if (!userData[field]) {
+      console.warn(`Campo obrigatório ausente: ${field}`);
+      return null;
+    }
+  }
+
+  // Normalizar dados do usuário
+  return {
+    id: userData.id,
+    email: userData.email,
+    name: userData.name || 'Usuário',
+    userType: userData.userType,
+    smartAccountAddress: userData.smartAccountAddress,
+    profile: userData.profile || {},
+    createdAt: userData.createdAt || new Date().toISOString()
+  };
+}
+
 export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
@@ -39,7 +66,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
     try {
       setIsLoading(true);
       const userProfile = await authAPI.getProfile(authToken);
-      setUser(userProfile);
+      const validatedUser = validateAndNormalizeUser(userProfile);
+
+      if (validatedUser) {
+        setUser(validatedUser);
+      } else {
+        console.error('Dados do usuário inválidos:', userProfile);
+        // Dados inválidos, limpar
+        localStorage.removeItem('agrofi_token');
+        setToken(null);
+      }
     } catch (error) {
       console.error('Erro ao carregar perfil:', error);
       // Token inválido, limpar
@@ -54,10 +90,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
     try {
       setIsLoading(true);
       const response = await authAPI.login(credentials);
-      
-      setToken(response.token);
-      setUser(response.user);
-      localStorage.setItem('agrofi_token', response.token);
+
+      const validatedUser = validateAndNormalizeUser(response.user);
+      if (validatedUser) {
+        setToken(response.token);
+        setUser(validatedUser);
+        localStorage.setItem('agrofi_token', response.token);
+      } else {
+        throw new Error('Dados do usuário inválidos recebidos do servidor');
+      }
     } catch (error) {
       throw error;
     } finally {
@@ -69,10 +110,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
     try {
       setIsLoading(true);
       const response = await authAPI.register(data);
-      
-      setToken(response.token);
-      setUser(response.user);
-      localStorage.setItem('agrofi_token', response.token);
+
+      const validatedUser = validateAndNormalizeUser(response.user);
+      if (validatedUser) {
+        setToken(response.token);
+        setUser(validatedUser);
+        localStorage.setItem('agrofi_token', response.token);
+      } else {
+        throw new Error('Dados do usuário inválidos recebidos do servidor');
+      }
     } catch (error) {
       throw error;
     } finally {

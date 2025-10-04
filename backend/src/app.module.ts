@@ -7,8 +7,10 @@ import { ProposalController } from './controllers/proposal.controller';
 import { MorphoController } from './controllers/morpho.controller';
 import { MorphoOnchainController } from './controllers/morpho-onchain.controller';
 import { AuthController } from './controllers/auth.controller';
+import { AuthV2Controller } from './controllers/auth-v2.controller';
 import { MarketplaceController } from './controllers/marketplace.controller';
 import { WalletController, MorphoOnChainController } from './controllers/wallet.controller';
+import { AFITokenController } from './controllers/afi-token.controller';
 import { ProposalService } from './services/proposal.service';
 import { RiskService } from './services/risk.service';
 import { RepaymentService } from './services/repayment.service';
@@ -16,8 +18,12 @@ import { DatabaseService } from './services/database.service';
 import { MorphoService } from './services/morpho.service';
 import { MorphoOnChainService } from './services/morpho-onchain.service';
 import { AccountAbstractionService } from './services/account-abstraction.service';
+import { UserManagementService } from './services/user-management.service';
 import { MarketplaceService } from './services/marketplace.service';
 import { WalletService } from './services/wallet.service';
+import { AgroFiTokenService } from './services/agrofi-token.service';
+import { MorphoLendingService } from './services/morpho-lending.service';
+import { UsdcFaucetService } from './services/usdc-faucet.service';
 import { UserEntity } from './entities/user.entity';
 import { ProposalEntity } from './entities/proposal-db.entity';
 import { InvestmentEntity } from './entities/investment.entity';
@@ -44,7 +50,7 @@ import { InvestmentEntity } from './entities/investment.entity';
     }),
     TypeOrmModule.forFeature([UserEntity, ProposalEntity, InvestmentEntity]),
   ],
-  controllers: [AppController, ProposalController, MorphoController, MorphoOnchainController, AuthController, MarketplaceController, WalletController, MorphoOnChainController],
-  providers: [AppService, ProposalService, RiskService, RepaymentService, DatabaseService, MorphoService, MorphoOnChainService, AccountAbstractionService, MarketplaceService, WalletService],
+  controllers: [AppController, ProposalController, MorphoController, MorphoOnchainController, AuthController, AuthV2Controller, MarketplaceController, WalletController, MorphoOnChainController, AFITokenController],
+  providers: [AppService, ProposalService, RiskService, RepaymentService, DatabaseService, MorphoService, MorphoOnChainService, AccountAbstractionService, UserManagementService, MarketplaceService, WalletService, AgroFiTokenService, MorphoLendingService, UsdcFaucetService],
 })
 export class AppModule {}

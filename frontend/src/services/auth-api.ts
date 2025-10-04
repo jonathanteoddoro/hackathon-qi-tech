@@ -59,10 +59,13 @@ class AuthAPI {
   }
 
   async register(data: RegisterRequest): Promise<AuthResponse> {
-    const response = await fetch(`${API_BASE_URL}/auth/register`, {
+    const response = await fetch(`${API_BASE_URL}/auth-v2/register`, {
       method: 'POST',
       headers: this.getHeaders(),
-      body: JSON.stringify(data),
+      body: JSON.stringify({
+        ...data,
+        profile: data.profile
+      }),
     });
 
     if (!response.ok) {
@@ -78,7 +81,7 @@ class AuthAPI {
   }
 
   async login(data: LoginRequest): Promise<AuthResponse> {
-    const response = await fetch(`${API_BASE_URL}/auth/login`, {
+    const response = await fetch(`${API_BASE_URL}/auth-v2/login`, {
       method: 'POST',
       headers: this.getHeaders(),
       body: JSON.stringify(data),
@@ -97,7 +100,7 @@ class AuthAPI {
   }
 
   async getProfile(token: string): Promise<User> {
-    const response = await fetch(`${API_BASE_URL}/auth/profile`, {
+    const response = await fetch(`${API_BASE_URL}/auth-v2/profile`, {
       method: 'GET',
       headers: this.getHeaders(token),
     });
@@ -107,7 +110,8 @@ class AuthAPI {
       throw new Error(error || 'Erro ao buscar perfil');
     }
 
-    return await response.json();
+    const result = await response.json();
+    return result.data;
   }
 
   async getSmartAccountDetails(token: string): Promise<{ address: string; balance: string }> {
