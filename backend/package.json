@@ -20,17 +20,28 @@
     "test:e2e": "jest --config ./test/jest-e2e.json"
   },
   "dependencies": {
+    "@morpho-org/morpho-blue": "^1.0.0",
+    "@morpho-org/morpho-blue-bundlers": "^1.1.2",
     "@nestjs/common": "^11.0.1",
     "@nestjs/config": "^4.0.2",
     "@nestjs/core": "^11.0.1",
     "@nestjs/platform-express": "^11.0.1",
     "@nestjs/typeorm": "^11.0.0",
+    "@openzeppelin/contracts": "^5.4.0",
+    "@safe-global/api-kit": "^4.0.0",
+    "@safe-global/protocol-kit": "^6.1.1",
     "@types/pg": "^8.15.5",
     "axios": "^1.12.2",
+    "bcryptjs": "^3.0.2",
+    "ethers": "^6.15.0",
+    "graphql": "^16.11.0",
+    "graphql-request": "^7.2.0",
+    "jsonwebtoken": "^9.0.2",
     "pg": "^8.16.3",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
-    "typeorm": "^0.3.27"
+    "typeorm": "^0.3.27",
+    "viem": "^2.37.12"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.2.0",

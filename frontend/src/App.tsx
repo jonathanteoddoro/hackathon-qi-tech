@@ -1,35 +1,33 @@
-import { Toaster } from "@/components/ui/toaster";
-import { Toaster as Sonner } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import Index from "./pages/Index";
-import Login from "./pages/Login";
-import ProducerDashboard from "./pages/ProducerDashboard";
-import InvestorDashboard from "./pages/InvestorDashboard";
-import NewProposal from "./pages/NewProposal";
-import NotFound from "./pages/NotFound";
+import { AuthProvider, useAuth } from './contexts/AuthContext';
+import AgroFiMarketplace from './components/AgroFiMarketplace';
+import AuthPage from './components/AuthPage';
+import './App.css';
 
-const queryClient = new QueryClient();
+function AppContent() {
+  const { isAuthenticated, isLoading } = useAuth();
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Index />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/producer/dashboard" element={<ProducerDashboard />} />
-          <Route path="/producer/new-proposal" element={<NewProposal />} />
-          <Route path="/investor/dashboard" element={<InvestorDashboard />} />
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
-    </TooltipProvider>
-  </QueryClientProvider>
-);
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-green-50 via-blue-50 to-indigo-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-green-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Carregando...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return isAuthenticated ? <AgroFiMarketplace /> : <AuthPage />;
+}
+
+function App() {
+  return (
+    <AuthProvider>
+      <div className="App">
+        <AppContent />
+      </div>
+    </AuthProvider>
+  );
+}
 
 export default App;
