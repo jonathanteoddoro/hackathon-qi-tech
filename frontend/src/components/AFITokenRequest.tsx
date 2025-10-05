@@ -1,10 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
-import { Upload, FileText, CheckCircle, AlertCircle, Coins } from 'lucide-react';
+import { Upload, FileText, CheckCircle, AlertCircle } from 'lucide-react';
 import { afiAPI, type AFIRequestData, type AFIBalance, type AFITransaction } from '../services/afi-api';
 
 export default function AFITokenRequest() {
@@ -105,63 +103,24 @@ export default function AFITokenRequest() {
   };
 
   return (
-    <div className="max-w-4xl mx-auto p-6 space-y-6">
-
-      {/* Saldo AFI */}
-      {afiBalance && (
-        <Card className="bg-gradient-to-r from-green-50 to-emerald-50 border-green-200">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Coins className="h-5 w-5 text-green-600" />
-              Saldo AFI Tokens
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-3xl font-bold text-green-700">
-                  {afiBalance.balance.toLocaleString()} AFI
-                </p>
-                <p className="text-sm text-gray-600">
-                  Endereço: {afiBalance.address.substring(0, 10)}...{afiBalance.address.substring(afiBalance.address.length - 8)}
-                </p>
-              </div>
-              <Badge variant="outline" className="bg-green-100 text-green-700">
-                {afiBalance.userType === 'producer' ? 'Produtor' : 'Investidor'}
-              </Badge>
+    <div className="space-y-6">
+          {/* Formulário de Solicitação */}
+          <div className="bg-white rounded-lg shadow-md p-6">
+            <div className="mb-6">
+              <h2 className="text-2xl font-bold text-gray-800 mb-2 flex items-center gap-3">
+                <FileText className="h-6 w-6 text-green-600" />
+                Solicitar AFI Tokens
+              </h2>
+              <p className="text-gray-600">
+                Envie documentos comprobatórios para receber AFI tokens baseados na sua produção agrícola
+              </p>
             </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Formulário de Solicitação */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <FileText className="h-5 w-5" />
-            Solicitar AFI Tokens
-          </CardTitle>
-          <CardDescription>
-            Envie documentos comprobatórios para receber AFI tokens baseados na sua produção agrícola
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {/* Aviso de Demonstração */}
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
-            <div className="flex items-center gap-2">
-              <span className="text-yellow-600">⚠️</span>
-              <h4 className="font-medium text-yellow-800">Ambiente de Demonstração</h4>
-            </div>
-            <p className="text-sm text-yellow-700 mt-1">
-              Qualquer documento será aceito automaticamente para fins de demonstração. 
-              Em produção, haveria validação rigorosa de CDA, WA e outros documentos de garantia.
-            </p>
-          </div>
-
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="expectedValue">Valor do Documento (R$) *</Label>
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="space-y-3">
+                <Label htmlFor="expectedValue" className="text-sm font-semibold text-gray-700">
+                  Valor do Documento (R$) *
+                </Label>
                 <Input
                   id="expectedValue"
                   type="number"
@@ -176,20 +135,24 @@ export default function AFITokenRequest() {
                   }}
                   placeholder="Ex: 150000"
                   required
+                  className="h-12 text-lg border-2 border-gray-300 focus:border-green-500 focus:ring-green-500 rounded-lg"
                 />
-                <p className="text-xs text-gray-500">
+                <p className="text-sm text-gray-600">
                   Valor monetário do documento de garantia
                 </p>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="sojaQuantity">Quantidade de Soja (sacas)</Label>
+              <div className="space-y-3">
+                <Label htmlFor="sojaQuantity" className="text-sm font-semibold text-gray-700">
+                  Quantidade de Soja (sacas)
+                </Label>
                 <Input
                   id="sojaQuantity"
                   type="number"
                   placeholder="Ex: 1000"
+                  className="h-12 text-lg border-2 border-gray-300 focus:border-green-500 focus:ring-green-500 rounded-lg"
                 />
-                <p className="text-xs text-gray-500">
+                <p className="text-sm text-gray-600">
                   Quantidade de soja referente ao documento
                 </p>
               </div>
@@ -209,11 +172,13 @@ export default function AFITokenRequest() {
               </div>
             )}
 
-            <div className="space-y-2">
-              <Label htmlFor="documentType">Tipo de Documento *</Label>
+            <div className="space-y-3">
+              <Label htmlFor="documentType" className="text-sm font-semibold text-gray-700">
+                Tipo de Documento *
+              </Label>
               <select
                 id="documentType"
-                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="w-full h-12 px-4 py-3 text-lg border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:border-green-500 bg-white shadow-sm"
                 value={formData.documentType}
                 onChange={(e) => setFormData({ ...formData, documentType: e.target.value as any })}
               >
@@ -224,6 +189,9 @@ export default function AFITokenRequest() {
                 <option value="harvest_report">Relatório de Colheita</option>
                 <option value="warehouse_receipt">Recibo de Armazém</option>
               </select>
+              <p className="text-sm text-gray-600">
+                Escolha o tipo de documento agrícola
+              </p>
             </div>
 
             <div className="space-y-2">
@@ -291,45 +259,9 @@ export default function AFITokenRequest() {
               {isLoading ? 'Processando...' : 'Solicitar AFI Tokens'}
             </Button>
           </form>
-        </CardContent>
-      </Card>
+          </div>
 
-      {/* Histórico de Transações */}
-      {transactions.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Histórico de Transações AFI</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {transactions.map((tx) => (
-                <div
-                  key={tx.id}
-                  className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="text-lg">{getTransactionIcon(tx.type)}</span>
-                    <div>
-                      <p className="font-medium">{tx.description}</p>
-                      <p className="text-sm text-gray-600">
-                        {tx.timestamp.toLocaleDateString('pt-BR')}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <p className={`font-bold ${tx.amount > 0 ? 'text-green-600' : 'text-red-600'}`}>
-                      {tx.amount > 0 ? '+' : ''}{tx.amount.toLocaleString()} AFI
-                    </p>
-                    <Badge variant={tx.status === 'completed' ? 'default' : 'secondary'}>
-                      {tx.status}
-                    </Badge>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
+          {/* Histórico de Transações */}
     </div>
   );
 }

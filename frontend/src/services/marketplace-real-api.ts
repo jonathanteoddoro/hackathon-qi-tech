@@ -14,7 +14,6 @@ export interface LoanRequest {
   collateralAmount: number;
   collateralType: string;
   warehouseLocation: string;
-  warehouseCertificate: string;
   status: 'open' | 'funding' | 'funded' | 'active' | 'completed';
   currentFunding: number;
   fundingPercentage: number;
@@ -32,7 +31,6 @@ export interface CreateLoanRequest {
   collateralAmount: number;
   collateralType: string;
   warehouseLocation: string;
-  warehouseCertificate: string;
 }
 
 export interface InvestmentRequest {
@@ -41,12 +39,17 @@ export interface InvestmentRequest {
 }
 
 export interface Investment {
-  loanId: string;
-  amount: number;
-  transactionHash: string;
-  investedAt: string;
-  loanStatus: string;
-  producerName: string;
+  loan: LoanRequest;
+  investment: {
+    userId: string;
+    amount: number;
+    investedAt: Date;
+  };
+  // Campos legados mantidos para compatibilidade
+  loanId?: string;
+  transactionHash?: string;
+  loanStatus?: string;
+  producerName?: string;
 }
 
 export interface P2PPosition {

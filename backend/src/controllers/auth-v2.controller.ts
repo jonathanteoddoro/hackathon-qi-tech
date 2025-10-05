@@ -135,10 +135,20 @@ export class AuthV2Controller {
       };
     } catch (error) {
       console.error('❌ [AUTH] Erro ao obter perfil:', error);
+      
+      let errorMessage = 'Erro ao obter perfil';
+      if (error instanceof Error) {
+        if (error.message === 'TOKEN_USER_NOT_FOUND') {
+          errorMessage = 'Token inválido: usuário não encontrado. Por favor, faça login novamente.';
+        } else {
+          errorMessage = error.message;
+        }
+      }
+      
       throw new HttpException(
         {
           success: false,
-          message: error instanceof Error ? error.message : 'Erro ao obter perfil',
+          message: errorMessage,
           timestamp: new Date().toISOString()
         },
         HttpStatus.UNAUTHORIZED

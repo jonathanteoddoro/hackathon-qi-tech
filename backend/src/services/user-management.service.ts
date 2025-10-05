@@ -147,6 +147,7 @@ export class UserManagementService {
       if (!user) {
         console.error('❌ Usuário do token não encontrado:', decoded.userId);
         console.log('👥 Usuários disponíveis:', Array.from(this.users.keys()));
+        console.log('💡 Possível causa: Token criado antes da reinicialização dos dados');
         throw new Error('TOKEN_USER_NOT_FOUND');
       }
 

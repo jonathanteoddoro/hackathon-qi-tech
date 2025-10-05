@@ -26,12 +26,14 @@ import {
   AlertTriangle,
   ExternalLink,
   RefreshCw,
-  Loader2
+  Loader2,
+  Calendar
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { marketplaceAPIReal, type LoanRequest, type CreateLoanRequest, type P2PPosition, type Investment } from '../services/marketplace-real-api';
 import UserHeader from './UserHeader';
 import AFITokenRequest from './AFITokenRequest';
+import ProducerPayments from './ProducerPayments';
 
 // Dados mockados baseados no projeto
 export default function AgroFiMarketplace() {
@@ -61,6 +63,17 @@ export default function AgroFiMarketplace() {
   const [loadingInvestments, setLoadingInvestments] = useState(false);
   const [loadingPositions, setLoadingPositions] = useState(false);
 
+  // Saldo inicial do investidor (pode vir do backend futuramente)
+  const INITIAL_BALANCE = 15000; // R$ 15.000,00 inicial
+
+  // Estados para dashboard do produtor
+  const [producerDashboard, setProducerDashboard] = useState<{
+    volumeTotal: number;
+    apyMedio: number;
+    taxaSucesso: number;
+    totalFinanciado: number;
+  } | null>(null);
+
   // Calculate real market data from actual loans
   const marketData = useMemo(() => {
     if (loans.length === 0) {
@@ -74,19 +87,22 @@ export default function AgroFiMarketplace() {
       };
     }
 
-    const totalRequested = loans.reduce((sum: number, loan: any) => sum + loan.amount, 0);
-    const totalFunded = loans.reduce((sum: number, loan: any) => sum + loan.currentAmount, 0);
-    const averageAPY = loans.reduce((sum: number, loan: any) => sum + loan.interestRate, 0) / loans.length;
-    const fundedLoans = loans.filter((loan: any) => loan.currentAmount >= loan.amount).length;
-    const successRate = (fundedLoans / loans.length) * 100;
+    const totalRequested = loans.reduce((sum: number, loan: any) => sum + (loan.requestedAmount || 0), 0);
+    const totalFunded = loans.reduce((sum: number, loan: any) => sum + (loan.currentFunding || 0), 0);
+    const averageAPY = loans.reduce((sum: number, loan: any) => sum + (loan.projectedAPY || loan.maxInterestRate || 0), 0) / loans.length;
+    
+    // Para investidores: Taxa de sucesso = % de empréstimos pagos com sucesso (completed)
+    const completedLoans = loans.filter((loan: any) => loan.status === 'completed').length;
+    const activeLoans = loans.filter((loan: any) => ['funded', 'active', 'completed'].includes(loan.status)).length;
+    const successRate = activeLoans > 0 ? (completedLoans / activeLoans) * 100 : 0;
 
     return {
       totalValue: totalRequested,
-      averageAPY,
-      successRate,
-      totalFunded,
+      averageAPY: isNaN(averageAPY) ? 0 : averageAPY,
+      successRate: isNaN(successRate) ? 0 : successRate,
+      totalFunded: isNaN(totalFunded) ? 0 : totalFunded,
       totalLoanRequests: loans.length,
-      totalVolume: totalRequested
+      totalVolume: isNaN(totalRequested) ? 0 : totalRequested
     };
   }, [loans]);
   
@@ -94,11 +110,10 @@ export default function AgroFiMarketplace() {
   const [loanForm, setLoanForm] = useState<CreateLoanRequest>({
     requestedAmount: 0,
     termMonths: 6,
-    maxInterestRate: 8.5,
+    maxInterestRate: 12.0,
     collateralAmount: 0,
     collateralType: 'soja',
-    warehouseLocation: '',
-    warehouseCertificate: ''
+    warehouseLocation: ''
   });
   
   // Usar o tipo de usuário da autenticação se disponível, senão padrão para investidor
@@ -132,16 +147,45 @@ export default function AgroFiMarketplace() {
         const positions: Record<string, P2PPosition> = {};
         for (const investment of investments) {
           try {
-            const position = await marketplaceAPIReal.getP2PPosition(investment.loanId, token);
-            positions[investment.loanId] = position;
+            // O backend retorna { loan, investment }, então precisamos acessar investment.loan.id
+            const loanId = investment.loan?.id;
+            if (loanId) {
+              const position = await marketplaceAPIReal.getP2PPosition(loanId, token);
+              positions[loanId] = position;
+            }
           } catch (error) {
-            console.warn(`Erro ao carregar posição P2P para ${investment.loanId}:`, error);
+            console.warn(`Erro ao carregar posição P2P para ${investment.loan?.id}:`, error);
           }
         }
         setP2pPositions(positions);
       } else if (userType === 'producer') {
         const loans = await marketplaceAPIReal.getMyLoans(token);
         setMyLoans(loans);
+        
+        // Carregar dados do dashboard do produtor
+        try {
+          console.log('📊 Buscando dashboard para:', user?.email);
+          const response = await fetch(`http://localhost:3001/api/dashboard/producer/${user?.email || 'producer'}`, {
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          });
+          console.log('📊 Response status:', response.status);
+          if (response.ok) {
+            const dashboardData = await response.json();
+            console.log('📊 Dashboard data recebido:', dashboardData);
+            setProducerDashboard({
+              volumeTotal: dashboardData.volumeTotal || 0,
+              apyMedio: dashboardData.apyMedio || 0,
+              taxaSucesso: dashboardData.taxaSucesso || 0,
+              totalFinanciado: dashboardData.totalFinanciado || 0
+            });
+          } else {
+            console.error('📊 Erro na resposta:', await response.text());
+          }
+        } catch (error) {
+          console.error('❌ Erro ao carregar dashboard do produtor:', error);
+        }
       }
     } catch (error) {
       console.error('Erro ao carregar dados do usuário:', error);
@@ -273,11 +317,10 @@ export default function AgroFiMarketplace() {
       setLoanForm({
         requestedAmount: 0,
         termMonths: 6,
-        maxInterestRate: 8.5,
+        maxInterestRate: 12.0,
         collateralAmount: 0,
         collateralType: 'soja',
-        warehouseLocation: '',
-        warehouseCertificate: ''
+        warehouseLocation: ''
       });
       setSelectedTab('marketplace');
     } catch (err) {
@@ -334,85 +377,183 @@ export default function AgroFiMarketplace() {
           </p>
         </div>
 
-        {/* Market Overview */}
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-8">
-          <Card className="border-0 shadow-md bg-white/80 backdrop-blur-sm">
-            <CardContent className="p-6">
-              <div className="flex items-center gap-3">
-                <div className="p-3 bg-blue-100 rounded-xl">
-                  <Target className="h-6 w-6 text-blue-600" />
+        {/* Market Overview - Personalizado por tipo de usuário */}
+        {userType === 'investor' ? (
+          // Visão do Mercado para INVESTIDORES
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-8">
+            <Card className="border-0 shadow-md bg-white/80 backdrop-blur-sm">
+              <CardContent className="p-6">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 bg-blue-100 rounded-xl">
+                    <Target className="h-6 w-6 text-blue-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500 font-medium">Oportunidades</p>
+                    <p className="text-2xl font-bold text-gray-900">{marketData.totalLoanRequests}</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-sm text-gray-500 font-medium">Solicitações</p>
-                  <p className="text-2xl font-bold text-gray-900">{marketData.totalLoanRequests}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
 
-          <Card className="border-0 shadow-md bg-white/80 backdrop-blur-sm">
-            <CardContent className="p-6">
-              <div className="flex items-center gap-3">
-                <div className="p-3 bg-green-100 rounded-xl">
-                  <DollarSign className="h-6 w-6 text-green-600" />
+            <Card className="border-0 shadow-md bg-white/80 backdrop-blur-sm">
+              <CardContent className="p-6">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 bg-green-100 rounded-xl">
+                    <Wallet className="h-6 w-6 text-green-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500 font-medium">Saldo Disponível</p>
+                    <p className="text-2xl font-bold text-gray-900">
+                      {formatCurrency(INITIAL_BALANCE - myInvestments.reduce((sum, inv) => sum + (inv.investment?.amount || 0), 0))}
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-sm text-gray-500 font-medium">Volume Total</p>
-                  <p className="text-2xl font-bold text-gray-900">{formatCurrency(marketData.totalVolume)}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
 
-          <Card className="border-0 shadow-md bg-white/80 backdrop-blur-sm">
-            <CardContent className="p-6">
-              <div className="flex items-center gap-3">
-                <div className="p-3 bg-purple-100 rounded-xl">
-                  <TrendingUp className="h-6 w-6 text-purple-600" />
+            <Card className="border-0 shadow-md bg-white/80 backdrop-blur-sm">
+              <CardContent className="p-6">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 bg-purple-100 rounded-xl">
+                    <TrendingUp className="h-6 w-6 text-purple-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500 font-medium">APY Médio</p>
+                    <p className="text-2xl font-bold text-gray-900">
+                      {!isNaN(marketData.averageAPY) ? marketData.averageAPY.toFixed(1) : '0.0'}%
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-sm text-gray-500 font-medium">APY Médio</p>
-                  <p className="text-2xl font-bold text-gray-900">{marketData.averageAPY.toFixed(1)}%</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
 
-          <Card className="border-0 shadow-md bg-white/80 backdrop-blur-sm">
-            <CardContent className="p-6">
-              <div className="flex items-center gap-3">
-                <div className="p-3 bg-emerald-100 rounded-xl">
-                  <Shield className="h-6 w-6 text-emerald-600" />
+            <Card className="border-0 shadow-md bg-white/80 backdrop-blur-sm">
+              <CardContent className="p-6">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 bg-emerald-100 rounded-xl">
+                    <Shield className="h-6 w-6 text-emerald-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500 font-medium">Taxa de Pagamento</p>
+                    <p className="text-2xl font-bold text-gray-900">
+                      {!isNaN(marketData.successRate) ? marketData.successRate.toFixed(1) : '0.0'}%
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-sm text-gray-500 font-medium">Taxa de Sucesso</p>
-                  <p className="text-2xl font-bold text-gray-900">{marketData.successRate.toFixed(1)}%</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
 
-          <Card className="border-0 shadow-md bg-white/80 backdrop-blur-sm">
-            <CardContent className="p-6">
-              <div className="flex items-center gap-3">
-                <div className="p-3 bg-indigo-100 rounded-xl">
-                  <Users className="h-6 w-6 text-indigo-600" />
+            <Card className="border-0 shadow-md bg-white/80 backdrop-blur-sm">
+              <CardContent className="p-6">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 bg-indigo-100 rounded-xl">
+                    <Wallet className="h-6 w-6 text-indigo-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500 font-medium">Meu Investido</p>
+                    <p className="text-2xl font-bold text-gray-900">
+                      {formatCurrency(myInvestments.reduce((sum, inv) => sum + (inv.investment?.amount || 0), 0))}
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-sm text-gray-500 font-medium">Financiado</p>
-                  <p className="text-2xl font-bold text-gray-900">{formatCurrency(marketData.totalFunded)}</p>
+              </CardContent>
+            </Card>
+          </div>
+        ) : (
+          // Visão do Mercado para PRODUTORES
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-8">
+            <Card className="border-0 shadow-md bg-white/80 backdrop-blur-sm">
+              <CardContent className="p-6">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 bg-green-100 rounded-xl">
+                    <Sprout className="h-6 w-6 text-green-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500 font-medium">Meus Empréstimos</p>
+                    <p className="text-2xl font-bold text-gray-900">{myLoans.length}</p>
+                  </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border-0 shadow-md bg-white/80 backdrop-blur-sm">
+              <CardContent className="p-6">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 bg-blue-100 rounded-xl">
+                    <Wallet className="h-6 w-6 text-blue-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500 font-medium">Saldo Disponível</p>
+                    <p className="text-2xl font-bold text-gray-900">
+                      {formatCurrency(myLoans.reduce((sum, loan) => sum + loan.currentFunding, 0))}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border-0 shadow-md bg-white/80 backdrop-blur-sm">
+              <CardContent className="p-6">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 bg-emerald-100 rounded-xl">
+                    <TrendingUp className="h-6 w-6 text-emerald-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500 font-medium">Total Solicitado</p>
+                    <p className="text-2xl font-bold text-gray-900">
+                      {formatCurrency(myLoans.reduce((sum, loan) => sum + loan.requestedAmount, 0))}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border-0 shadow-md bg-white/80 backdrop-blur-sm">
+              <CardContent className="p-6">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 bg-purple-100 rounded-xl">
+                    <Target className="h-6 w-6 text-purple-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500 font-medium">Empréstimos Ativos</p>
+                    <p className="text-2xl font-bold text-gray-900">
+                      {myLoans.filter(loan => loan.status === 'funding' || loan.status === 'funded').length}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border-0 shadow-md bg-white/80 backdrop-blur-sm">
+              <CardContent className="p-6">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 bg-orange-100 rounded-xl">
+                    <Clock className="h-6 w-6 text-orange-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-gray-500 font-medium">Pagamentos Pendentes</p>
+                    <p className="text-2xl font-bold text-gray-900">
+                      {myLoans.reduce((sum, loan) => {
+                        // Calcula número de pagamentos pendentes baseado no status e prazo
+                        if (loan.status === 'funded' || loan.status === 'active') {
+                          return sum + (loan.termMonths || 0);
+                        }
+                        return sum;
+                      }, 0)}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
 
         {/* User Header */}
         <UserHeader />
 
         <Tabs value={selectedTab} onValueChange={setSelectedTab} className="w-full">
           <TabsList className={`grid w-full bg-white/80 backdrop-blur-sm rounded-xl shadow-lg border-0 p-1 ${
-            userType === 'producer' ? 'grid-cols-5' : 'grid-cols-3'
+            userType === 'producer' ? 'grid-cols-5' : 'grid-cols-2'
           }`}>
             <TabsTrigger value="marketplace" className="rounded-lg font-medium">
               🏪 Marketplace
@@ -420,11 +561,11 @@ export default function AgroFiMarketplace() {
             <TabsTrigger value="dashboard" className="rounded-lg font-medium">
               📊 {userType === 'investor' ? 'Portfólio' : 'Meus Empréstimos'}
             </TabsTrigger>
-            <TabsTrigger value="p2p" className="rounded-lg font-medium">
-              🏦 {userType === 'investor' ? 'Posições P2P' : 'Minhas Posições'}
-            </TabsTrigger>
             {userType === 'producer' && (
               <>
+                <TabsTrigger value="payments" className="rounded-lg font-medium">
+                  💳 Pagamentos
+                </TabsTrigger>
                 <TabsTrigger value="afi" className="rounded-lg font-medium">
                   🌟 AFI Tokens
                 </TabsTrigger>
@@ -880,6 +1021,132 @@ export default function AgroFiMarketplace() {
 
           {/* Dashboard Tab */}
           <TabsContent value="dashboard" className="mt-6">
+            {userType === 'producer' ? (
+              // Dashboard do Produtor
+              <div className="space-y-6">
+                {/* Cards de Métricas do Produtor */}
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <Card className="border-0 shadow-md bg-white/80 backdrop-blur-sm">
+                    <CardContent className="p-6">
+                      <div className="flex items-center gap-3">
+                        <div className="p-3 bg-green-100 rounded-xl">
+                          <DollarSign className="h-6 w-6 text-green-600" />
+                        </div>
+                        <div>
+                          <p className="text-sm text-gray-500 font-medium">Volume Total</p>
+                          <p className="text-2xl font-bold text-gray-900">
+                            {producerDashboard && !isNaN(producerDashboard.volumeTotal) 
+                              ? formatCurrency(producerDashboard.volumeTotal) 
+                              : 'R$ 0,00'}
+                          </p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="border-0 shadow-md bg-white/80 backdrop-blur-sm">
+                    <CardContent className="p-6">
+                      <div className="flex items-center gap-3">
+                        <div className="p-3 bg-purple-100 rounded-xl">
+                          <TrendingUp className="h-6 w-6 text-purple-600" />
+                        </div>
+                        <div>
+                          <p className="text-sm text-gray-500 font-medium">APY Médio</p>
+                          <p className="text-2xl font-bold text-gray-900">
+                            {producerDashboard && !isNaN(producerDashboard.apyMedio)
+                              ? `${producerDashboard.apyMedio.toFixed(1)}%` 
+                              : '0.0%'}
+                          </p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="border-0 shadow-md bg-white/80 backdrop-blur-sm">
+                    <CardContent className="p-6">
+                      <div className="flex items-center gap-3">
+                        <div className="p-3 bg-emerald-100 rounded-xl">
+                          <Shield className="h-6 w-6 text-emerald-600" />
+                        </div>
+                        <div>
+                          <p className="text-sm text-gray-500 font-medium">Taxa de Financiamento</p>
+                          <p className="text-2xl font-bold text-gray-900">
+                            {myLoans.length > 0 
+                              ? `${((myLoans.filter(loan => loan.status === 'funded' || loan.status === 'completed').length / myLoans.length) * 100).toFixed(1)}%`
+                              : '0.0%'}
+                          </p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="border-0 shadow-md bg-white/80 backdrop-blur-sm">
+                    <CardContent className="p-6">
+                      <div className="flex items-center gap-3">
+                        <div className="p-3 bg-indigo-100 rounded-xl">
+                          <Users className="h-6 w-6 text-indigo-600" />
+                        </div>
+                        <div>
+                          <p className="text-sm text-gray-500 font-medium">Financiado</p>
+                          <p className="text-2xl font-bold text-gray-900">
+                            {producerDashboard && !isNaN(producerDashboard.totalFinanciado)
+                              ? formatCurrency(producerDashboard.totalFinanciado) 
+                              : 'R$ 0,00'}
+                          </p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+
+                {/* Meus Empréstimos Ativos */}
+                {myLoans.length > 0 && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Meus Empréstimos Ativos</CardTitle>
+                      <CardDescription>Financiamentos recebidos e status de pagamento</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-4">
+                        {myLoans.map((loan) => (
+                          <div key={loan.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                            <div>
+                              <p className="font-medium text-lg">{formatCurrency(loan.requestedAmount)}</p>
+                              <p className="text-sm text-gray-600">
+                                Taxa: {loan.maxInterestRate}% | Prazo: {loan.termMonths} meses
+                              </p>
+                              <p className="text-xs text-gray-500">
+                                Solicitado em {new Date(loan.createdAt).toLocaleDateString('pt-BR')}
+                              </p>
+                            </div>
+                            <div className="text-right">
+                              <Badge className={getStatusColor(loan.status)}>
+                                {loan.status === 'open' ? 'Aberto' :
+                                 loan.status === 'funding' ? 'Em Financiamento' :
+                                 loan.status === 'funded' ? 'Financiado' :
+                                 loan.status === 'active' ? 'Ativo' :
+                                 loan.status === 'completed' ? 'Quitado' : loan.status}
+                              </Badge>
+                              <div className="mt-2">
+                                <Progress 
+                                  value={loan.fundingPercentage} 
+                                  className="w-32"
+                                />
+                                <p className="text-xs text-gray-600 mt-1">
+                                  {formatCurrency(loan.currentFunding)} / {formatCurrency(loan.requestedAmount)}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
+            ) : (
+              // Dashboard do Investidor (código original)
+            <div className="space-y-6">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               <Card>
                 <CardHeader>
@@ -893,19 +1160,21 @@ export default function AgroFiMarketplace() {
                     <div>
                       <p className="text-sm text-gray-600">Saldo Total</p>
                       <p className="text-3xl font-bold">
-                        {formatCurrency(myInvestments.reduce((sum, inv) => sum + inv.amount, 0) + 12780)}
+                        {formatCurrency(INITIAL_BALANCE)}
                       </p>
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <p className="text-sm text-gray-600">Investido P2P</p>
                         <p className="text-lg font-semibold text-blue-600">
-                          {formatCurrency(myInvestments.reduce((sum, inv) => sum + inv.amount, 0))}
+                          {formatCurrency(myInvestments.reduce((sum, inv) => sum + (inv.investment?.amount || 0), 0))}
                         </p>
                       </div>
                       <div>
                         <p className="text-sm text-gray-600">Disponível</p>
-                        <p className="text-lg font-semibold text-green-600">R$ 12.780,00</p>
+                        <p className="text-lg font-semibold text-green-600">
+                          {formatCurrency(INITIAL_BALANCE - myInvestments.reduce((sum, inv) => sum + (inv.investment?.amount || 0), 0))}
+                        </p>
                       </div>
                     </div>
                   </div>
@@ -956,27 +1225,27 @@ export default function AgroFiMarketplace() {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    {myInvestments.slice(0, 5).map((investment) => (
-                      <div key={investment.loanId} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                    {myInvestments.slice(0, 5).map((inv) => (
+                      <div key={inv.loan?.id || `inv-${inv.investment.investedAt}`} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                         <div>
-                          <p className="font-medium">{investment.producerName}</p>
-                          <p className="text-sm text-gray-600">Investimento: {formatCurrency(investment.amount)}</p>
+                          <p className="font-medium">{inv.loan?.producer?.name || 'Produtor'}</p>
+                          <p className="text-sm text-gray-600">Investimento: {formatCurrency(inv.investment.amount)}</p>
                           <p className="text-xs text-gray-500">
-                            {new Date(investment.investedAt).toLocaleDateString('pt-BR')}
+                            {new Date(inv.investment.investedAt).toLocaleDateString('pt-BR')}
                           </p>
                         </div>
                         <div className="text-right">
-                          <Badge className={getStatusColor(investment.loanStatus)}>
-                            {investment.loanStatus === 'funded' ? 'Financiado' :
-                             investment.loanStatus === 'active' ? 'Ativo' :
-                             investment.loanStatus === 'completed' ? 'Concluído' : investment.loanStatus}
+                          <Badge className={getStatusColor(inv.loan?.status || 'open')}>
+                            {inv.loan?.status === 'funded' ? 'Financiado' :
+                             inv.loan?.status === 'funding' ? 'Em Financiamento' :
+                             inv.loan?.status === 'completed' ? 'Concluído' : inv.loan?.status || 'Aberto'}
                           </Badge>
-                          {investment.transactionHash && (
+                          {inv.transactionHash && (
                             <Button
                               size="sm"
                               variant="ghost"
                               className="mt-1 h-6 px-2 text-xs"
-                              onClick={() => window.open(`https://sepolia.etherscan.io/tx/${investment.transactionHash}`, '_blank')}
+                              onClick={() => window.open(`https://sepolia.etherscan.io/tx/${inv.transactionHash}`, '_blank')}
                             >
                               <ExternalLink className="h-3 w-3 mr-1" />
                               Tx
@@ -989,7 +1258,16 @@ export default function AgroFiMarketplace() {
                 </CardContent>
               </Card>
             )}
+            </div>
+            )}
           </TabsContent>
+
+          {/* Payments Tab - Only for Producers */}
+          {userType === 'producer' && (
+            <TabsContent value="payments" className="mt-6">
+              <ProducerPayments producerName={user?.email || 'producer'} />
+            </TabsContent>
+          )}
 
           {/* P2P Positions Tab */}
           <TabsContent value="p2p" className="mt-6">
@@ -1005,7 +1283,7 @@ export default function AgroFiMarketplace() {
                       <div>
                         <p className="text-sm text-gray-500 font-medium">Total Emprestado</p>
                         <p className="text-2xl font-bold text-gray-900">
-                          {formatCurrency(myInvestments.reduce((sum, inv) => sum + inv.amount, 0))}
+                          {formatCurrency(myInvestments.reduce((sum, inv) => sum + (inv.investment?.amount || 0), 0))}
                         </p>
                       </div>
                     </div>
@@ -1207,42 +1485,18 @@ export default function AgroFiMarketplace() {
                         required
                       />
                     </div>
-                    <div>
-                      <Label htmlFor="certificate">Certificado de Depósito</Label>
-                      <Input 
-                        id="certificate" 
-                        placeholder="CDA-001234"
-                        value={loanForm.warehouseCertificate}
-                        onChange={(e) => setLoanForm({...loanForm, warehouseCertificate: e.target.value})}
-                        required
-                      />
-                    </div>
+
                     <div>
                       <Label htmlFor="interest">Taxa Máxima (% ao ano)</Label>
                       <Input 
                         id="interest" 
                         type="number" 
                         step="0.1"
-                        placeholder="8.5"
+                        placeholder="12.0"
                         value={loanForm.maxInterestRate}
-                        onChange={(e) => setLoanForm({...loanForm, maxInterestRate: parseFloat(e.target.value) || 8.5})}
+                        onChange={(e) => setLoanForm({...loanForm, maxInterestRate: parseFloat(e.target.value) || 12.0})}
                         required
                       />
-                    </div>
-                  </div>
-
-                  <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-lg mb-6">
-                    <div className="flex items-start gap-3">
-                      <Info className="h-5 w-5 text-yellow-600 mt-0.5" />
-                      <div>
-                        <p className="font-medium text-yellow-800">Documentos Necessários</p>
-                        <ul className="text-sm text-yellow-700 mt-1 space-y-1">
-                          <li>• CPF e RG</li>
-                          <li>• Comprovante de propriedade rural</li>
-                          <li>• Certificado de Depósito Agrícola (CDA)</li>
-                          <li>• Histórico de produção</li>
-                        </ul>
-                      </div>
                     </div>
                   </div>
 

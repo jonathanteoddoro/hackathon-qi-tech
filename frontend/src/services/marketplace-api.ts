@@ -40,7 +40,6 @@ export interface LoanRequest {
   fundingPercentage: number;
   estimatedReturn: number;
   warehouseLocation: string;
-  warehouseCertificate: string;
   createdAt: string;
   expiresAt: string;
   projectedAPY: number;

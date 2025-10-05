@@ -96,7 +96,7 @@ async function testP2PRealFlow() {
       collateralAmount: 600, // 600 ton de soja
       collateralType: 'soja',
       warehouseLocation: 'Armazém P2P - MT',
-      warehouseCertificate: 'CDA-P2P001',
+
       producerToken
     });
 

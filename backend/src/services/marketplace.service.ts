@@ -13,7 +13,6 @@ export interface LoanRequest {
   collateralAmount: number;
   collateralType: string;
   warehouseLocation: string;
-  warehouseCertificate: string;
   status: 'open' | 'funding' | 'funded' | 'repaying' | 'completed' | 'defaulted';
   currentFunding: number;
   createdAt: Date;
@@ -33,7 +32,6 @@ export interface CreateLoanRequestDto {
   collateralAmount: number;
   collateralType: string;
   warehouseLocation: string;
-  warehouseCertificate: string;
   producerToken: string;
 }
 
@@ -128,7 +126,6 @@ export class MarketplaceService {
         collateralAmount: data.collateralAmount,
         collateralType: data.collateralType,
         warehouseLocation: data.warehouseLocation,
-        warehouseCertificate: data.warehouseCertificate,
         status: 'open',
         currentFunding: 0,
         createdAt: new Date(),
@@ -327,9 +324,22 @@ export class MarketplaceService {
     }> = [];
 
     for (const loan of loans) {
-      const investment = loan.investors.find(inv => inv.userId === investor.id);
-      if (investment) {
-        investments.push({ loan, investment });
+      // Buscar TODOS os investimentos deste investidor neste loan
+      const userInvestments = loan.investors.filter(inv => inv.userId === investor.id);
+      
+      if (userInvestments.length > 0) {
+        // Somar todos os investimentos do mesmo investidor no mesmo loan
+        const totalAmount = userInvestments.reduce((sum, inv) => sum + inv.amount, 0);
+        const firstInvestment = userInvestments[0]; // Pegar data do primeiro
+        
+        investments.push({ 
+          loan, 
+          investment: {
+            userId: investor.id,
+            amount: totalAmount, // Soma total!
+            investedAt: firstInvestment.investedAt
+          }
+        });
       }
     }
 

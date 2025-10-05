@@ -76,7 +76,7 @@ async function runQuickTest() {
       collateralAmount: 200,
       collateralType: 'soja',
       warehouseLocation: 'Armazém Demo - MT',
-      warehouseCertificate: 'CDA-DEMO001',
+
       producerToken
     });
 

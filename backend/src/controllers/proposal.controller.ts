@@ -1,7 +1,8 @@
-import { Controller, Get, Post, Body, Param, Query } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Query, Headers } from '@nestjs/common';
 import { ProposalService } from '../services/proposal.service';
 import { RiskService } from '../services/risk.service';
 import { RepaymentService } from '../services/repayment.service';
+import { MarketplaceService } from '../services/marketplace.service';
 
 @Controller('api')
 export class ProposalController {
@@ -9,6 +10,7 @@ export class ProposalController {
     private readonly proposalService: ProposalService,
     private readonly riskService: RiskService,
     private readonly repaymentService: RepaymentService,
+    private readonly marketplaceService: MarketplaceService,
   ) {}
 
   // 🌱 APIS DO PRODUTOR
@@ -82,9 +84,78 @@ export class ProposalController {
     return await this.proposalService.getInvestorDashboard(investorName);
   }
 
-  @Get('dashboard/producer/:producerName')
-  async getProducerDashboard(@Param('producerName') producerName: string) {
-    return await this.proposalService.getProducerDashboard(producerName);
+  @Get('dashboard/producer/:producerIdentifier')
+  async getProducerDashboard(
+    @Param('producerIdentifier') producerIdentifier: string,
+    @Headers('authorization') authHeader?: string
+  ) {
+    // Se tiver token no header, busca do marketplace (memória)
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.substring(7);
+      try {
+        const loans = await this.marketplaceService.getMyLoans(token);
+        
+        // Se há loans no marketplace, usar esses dados
+        if (loans && loans.length > 0) {
+          // Calcular métricas dos loans do marketplace
+          const fundedLoans = loans.filter(l => l.status === 'funded' || l.status === 'funding' || l.status === 'completed');
+          const volumeTotal = fundedLoans.reduce((sum, l) => sum + l.currentFunding, 0);
+          const totalRequested = loans.reduce((sum, l) => sum + l.requestedAmount, 0);
+          const totalFunded = fundedLoans.reduce((sum, l) => sum + l.currentFunding, 0);
+          const activeLoans = loans.filter(l => l.status === 'funding' || l.status === 'funded').length;
+          
+          // APY médio (simplificado - baseado na taxa máxima)
+          const apyMedio = loans.length > 0
+            ? loans.reduce((sum, l) => sum + l.maxInterestRate, 0) / loans.length
+            : 0;
+          
+          // Taxa de sucesso
+          const successfulLoans = fundedLoans.length;
+          const taxaSucesso = loans.length > 0 
+            ? (successfulLoans / loans.length) * 100 
+            : 0;
+          
+          return {
+            volumeTotal,
+            apyMedio,
+            taxaSucesso,
+            totalFinanciado: totalFunded,
+            totalRequested,
+            totalFunded,
+            activeLoans,
+            proposals: loans,
+            repaymentSchedules: [],
+            upcomingPayments: []
+          };
+        }
+        // Se não há loans no marketplace, fazer fallback para banco
+        console.log('🔄 Nenhum loan no marketplace, fazendo fallback para banco de dados');
+      } catch (error) {
+        console.error('Erro ao buscar do marketplace:', error);
+        // Fallback para proposals antigas
+      }
+    }
+    
+    // Tenta buscar pelo producerName primeiro (proposals antigas no SQL)
+    const proposalsData = await this.proposalService.getProducerDashboard(producerIdentifier);
+    
+    // Se não houver proposals (banco vazio), retorna zeros mas não NaN
+    if (!proposalsData.proposals || proposalsData.proposals.length === 0) {
+      return {
+        volumeTotal: 0,
+        apyMedio: 0,
+        taxaSucesso: 0,
+        totalFinanciado: 0,
+        totalRequested: 0,
+        totalFunded: 0,
+        activeLoans: 0,
+        proposals: [],
+        repaymentSchedules: [],
+        upcomingPayments: []
+      };
+    }
+    
+    return proposalsData;
   }
 
   // 🚨 APIS DE RISCO E MONITORAMENTO

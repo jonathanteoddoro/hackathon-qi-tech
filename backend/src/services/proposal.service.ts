@@ -231,6 +231,10 @@ export class ProposalService {
     totalRequested: number;
     totalFunded: number;
     activeLoans: number;
+    volumeTotal: number;
+    apyMedio: number;
+    taxaSucesso: number;
+    totalFinanciado: number;
     repaymentSchedules: any[];
     upcomingPayments: any[];
   }> {
@@ -238,6 +242,29 @@ export class ProposalService {
     const totalRequested = proposals.reduce((sum, p) => sum + p.requestedAmount, 0);
     const totalFunded = proposals.reduce((sum, p) => sum + p.fundedAmount, 0);
     const activeLoans = proposals.filter(p => p.status === 'FUNDED' || p.status === 'ACTIVE').length;
+
+    // Calcular métricas adicionais
+    const fundedProposals = proposals.filter(p => p.status === 'FUNDED' || p.status === 'ACTIVE' || p.status === 'REPAID');
+    const volumeTotal = fundedProposals.reduce((sum, p) => sum + p.fundedAmount, 0);
+    
+    // APY Médio baseado nas taxas de interesse
+    const apyMedio = fundedProposals.length > 0
+      ? fundedProposals.reduce((sum, p) => {
+          // Calcula APY baseado no risco: A=12%, B=15%, C=18%
+          const baseRate = p.riskScore === 'A' ? 12 : p.riskScore === 'B' ? 15 : 18;
+          return sum + baseRate;
+        }, 0) / fundedProposals.length
+      : 0;
+    
+    // Taxa de Sucesso = (propostas pagas + ativas) / total de propostas financiadas
+    const successfulLoans = proposals.filter(p => 
+      p.status === 'REPAID' || p.status === 'ACTIVE' || p.status === 'FUNDED'
+    ).length;
+    const taxaSucesso = proposals.length > 0 
+      ? (successfulLoans / proposals.length) * 100 
+      : 0;
+    
+    const totalFinanciado = totalFunded;
 
     const repaymentSchedules = proposals
       .filter(p => p.status === 'FUNDED' || p.status === 'ACTIVE')
@@ -252,6 +279,10 @@ export class ProposalService {
       totalRequested,
       totalFunded,
       activeLoans,
+      volumeTotal,
+      apyMedio,
+      taxaSucesso,
+      totalFinanciado,
       repaymentSchedules,
       upcomingPayments
     };

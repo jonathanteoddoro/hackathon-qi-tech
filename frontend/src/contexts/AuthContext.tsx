@@ -50,6 +50,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<User | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [showTokenExpiredNotice, setShowTokenExpiredNotice] = useState(false);
 
   useEffect(() => {
     // Verificar se há token salvo no localStorage
@@ -78,9 +79,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
       }
     } catch (error) {
       console.error('Erro ao carregar perfil:', error);
+      console.log('🔄 Limpando token inválido (possível reinicialização dos dados)');
       // Token inválido, limpar
       localStorage.removeItem('agrofi_token');
       setToken(null);
+      setUser(null);
+      setShowTokenExpiredNotice(true);
+      
+      // Esconder notificação após 5 segundos
+      setTimeout(() => setShowTokenExpiredNotice(false), 5000);
     } finally {
       setIsLoading(false);
     }
@@ -144,6 +151,17 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   return (
     <AuthContext.Provider value={value}>
+      {showTokenExpiredNotice && (
+        <div className="fixed top-4 right-4 bg-orange-100 border border-orange-200 text-orange-800 px-4 py-3 rounded-lg shadow-lg z-50">
+          <div className="flex items-center gap-2">
+            <span>⚠️</span>
+            <div>
+              <p className="font-medium">Sessão Expirada</p>
+              <p className="text-sm">Por favor, faça login novamente</p>
+            </div>
+          </div>
+        </div>
+      )}
       {children}
     </AuthContext.Provider>
   );
