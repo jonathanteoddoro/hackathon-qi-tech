@@ -85,12 +85,16 @@ Abaixo está um diagrama que resume a arquitetura: fluxo entre usuários, fronte
 - Entities: `user`, `proposal`, `investment` — modelos simples ainda não conectados a ORM.
 - Types: `token.types.ts` — ABIs e interfaces de integração on-chain.
 
-## Mudanças do Projeto Inicial
+## Reestruturação do Projeto Inicial
 
 **Account Abstraction Simplificada**: Implementação de uma smart account simplificada (EOA) para abstrair complexidade de chaves privadas na UX, uma vez que acreditamos que esse fluxo acabaria com a barreira de entrada para nossos usuários, que não vão precisar lidar com a criação de carteiras, que se trata de um fluxo que pode ser considerado complexo pelos usuários finais.
 
 **Tokenização de terra**: Optamos por tokenizar a terra como colateral, ao invés de soja, que se enquadrava no escopo inicial. Acreditamos que a terra como colateral traz mais segurança para o investidor, uma vez que a terra é um ativo mais estável e menos volátil do que a soja, além de não ser um produto perecível.
 
 **Stack Backend Simplificada (NestJS + PostgreSQL)**: Uso de NestJS pela organização modular e rapidez em prototipar; dados ficam no banco PostgreSQL acelerando iterações no hackathon, focando validar fluxo P2P e integrações blockchain.
+
+### Conclusão
+No restante, as demais premissas, objetivos de transparência, foco em redução de barreiras de crédito e visão de evolução (on/off-ramp, oráculos, liquidação automatizada, scoring de risco) permanecem iguais ao planejamento original. Esta fase prioriza validação rápida do fluxo núcleo para acelerar os próximos incrementos.
+
 
 
