@@ -50,12 +50,12 @@ export default function UserHeader() {
   };
 
   return (
-    <Card className="border-0 shadow-md bg-white/80 backdrop-blur-sm mb-6">
+    <Card className="border border-gray-200 shadow-sm bg-white mb-6">
       <CardContent className="p-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <Avatar className="h-12 w-12">
-              <AvatarFallback className="bg-green-100 text-green-700 font-semibold">
+              <AvatarFallback className="bg-gray-100 text-gray-700 font-semibold border border-gray-200">
                 {getUserInitials(user.name)}
               </AvatarFallback>
             </Avatar>
@@ -85,9 +85,9 @@ export default function UserHeader() {
                   <span className="font-mono">{formatAddress(user.smartAccountAddress)}</span>
                 </div>
                 {user.userType === 'producer' && afiBalance !== null && (
-                  <div className="flex items-center gap-1 bg-green-50 px-2 py-1 rounded">
-                    <Coins className="h-4 w-4 text-green-600" />
-                    <span className="font-semibold text-green-700">
+                  <div className="flex items-center gap-1 bg-gray-50 px-2 py-1 rounded border border-gray-200">
+                    <Coins className="h-4 w-4 text-gray-600" />
+                    <span className="font-semibold text-gray-700">
                       {afiBalance.toLocaleString()} AFI
                     </span>
                   </div>

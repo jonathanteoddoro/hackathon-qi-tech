@@ -142,35 +142,8 @@ export default function AFITokenRequest() {
                 </p>
               </div>
 
-              <div className="space-y-3">
-                <Label htmlFor="sojaQuantity" className="text-sm font-semibold text-gray-700">
-                  Quantidade de Soja (sacas)
-                </Label>
-                <Input
-                  id="sojaQuantity"
-                  type="number"
-                  placeholder="Ex: 1000"
-                  className="h-12 text-lg border-2 border-gray-300 focus:border-green-500 focus:ring-green-500 rounded-lg"
-                />
-                <p className="text-sm text-gray-600">
-                  Quantidade de soja referente ao documento
-                </p>
-              </div>
             </div>
 
-            {formData.expectedValue > 0 && (
-              <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-                <h4 className="font-medium text-blue-700 mb-2">📊 Estimativa de Tokens</h4>
-                <p className="text-sm text-blue-600">
-                  Baseado no valor de <strong>R$ {formData.expectedValue.toLocaleString()}</strong>, 
-                  você receberá aproximadamente <strong>{formData.expectedValue.toLocaleString()} AFI tokens</strong> 
-                  após validação do documento.
-                </p>
-                <p className="text-xs text-blue-500 mt-1">
-                  Relação 1:1 - R$ 1,00 = 1 AFI Token
-                </p>
-              </div>
-            )}
 
             <div className="space-y-3">
               <Label htmlFor="documentType" className="text-sm font-semibold text-gray-700">
@@ -182,12 +155,7 @@ export default function AFITokenRequest() {
                 value={formData.documentType}
                 onChange={(e) => setFormData({ ...formData, documentType: e.target.value as any })}
               >
-                <option value="cda">CDA - Certificado de Depósito Agropecuário</option>
-                <option value="wa">WA - Warrant Agropecuário</option>
-                <option value="cpr">CPR - Cédula de Produto Rural</option>
-                <option value="production_certificate">Certificado de Produção</option>
-                <option value="harvest_report">Relatório de Colheita</option>
-                <option value="warehouse_receipt">Recibo de Armazém</option>
+                <option value="cda">Documento de Propriedade</option>
               </select>
               <p className="text-sm text-gray-600">
                 Escolha o tipo de documento agrícola
@@ -218,9 +186,6 @@ export default function AFITokenRequest() {
                       </span>
                       <span className="text-xs text-gray-500 block mt-1">
                         PDF, JPG, PNG, DOC, TXT até 50MB
-                      </span>
-                      <span className="text-xs text-blue-600 block mt-1">
-                        Qualquer documento é aceito para demonstração
                       </span>
                     </label>
                     <input

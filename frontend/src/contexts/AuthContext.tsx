@@ -22,28 +22,34 @@ interface AuthProviderProps {
 // Função para validar e normalizar dados do usuário
 function validateAndNormalizeUser(userData: any): User | null {
   if (!userData || typeof userData !== 'object') {
+    console.warn('Dados do usuário são nulos ou não são um objeto:', userData);
     return null;
   }
+
+  console.log('🔍 Validando dados do usuário recebidos:', userData);
 
   // Verificar propriedades obrigatórias
   const requiredFields = ['id', 'email', 'userType', 'smartAccountAddress'];
   for (const field of requiredFields) {
     if (!userData[field]) {
-      console.warn(`Campo obrigatório ausente: ${field}`);
+      console.warn(`Campo obrigatório ausente: ${field}`, userData);
       return null;
     }
   }
 
   // Normalizar dados do usuário
-  return {
+  const normalizedUser = {
     id: userData.id,
     email: userData.email,
-    name: userData.name || 'Usuário',
+    name: userData.name || userData.profile?.name || 'Usuário',
     userType: userData.userType,
     smartAccountAddress: userData.smartAccountAddress,
     profile: userData.profile || {},
     createdAt: userData.createdAt || new Date().toISOString()
   };
+
+  console.log('✅ Usuário normalizado:', normalizedUser);
+  return normalizedUser;
 }
 
 export function AuthProvider({ children }: AuthProviderProps) {

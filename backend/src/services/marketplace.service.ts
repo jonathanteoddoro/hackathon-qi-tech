@@ -71,11 +71,18 @@ export class MarketplaceService {
       loans.map(async (loan) => {
         try {
           const producer = await this.userService.getUserById(loan.producerId);
+          this.logger.debug(`📋 Mapeando loan ${loan.id} com produtor:`, {
+            producerId: producer.id,
+            name: producer.profile.name,
+            location: producer.profile.location,
+            farmName: producer.profile.farmName
+          });
+          
           return {
             ...loan,
             producer: {
               id: producer.id,
-              name: producer.profile.name,
+              name: producer.profile.name || 'Produtor',
               location: producer.profile.location || 'N/A',
               farmName: producer.profile.farmName || 'N/A',
               riskScore: 'A',

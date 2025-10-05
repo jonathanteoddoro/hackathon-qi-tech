@@ -27,10 +27,13 @@ import {
   ExternalLink,
   RefreshCw,
   Loader2,
-  Calendar
+  Calendar,
+  Plus,
+  X
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { marketplaceAPIReal, type LoanRequest, type CreateLoanRequest, type P2PPosition, type Investment } from '../services/marketplace-real-api';
+import { afiAPI } from '../services/afi-api';
 import UserHeader from './UserHeader';
 import AFITokenRequest from './AFITokenRequest';
 import ProducerPayments from './ProducerPayments';
@@ -60,8 +63,14 @@ export default function AgroFiMarketplace() {
   const [myInvestments, setMyInvestments] = useState<Investment[]>([]);
   const [myLoans, setMyLoans] = useState<LoanRequest[]>([]);
   const [p2pPositions, setP2pPositions] = useState<Record<string, P2PPosition>>({});
-  const [loadingInvestments, setLoadingInvestments] = useState(false);
   const [loadingPositions, setLoadingPositions] = useState(false);
+
+  // Estados para notificações
+  const [notification, setNotification] = useState<{
+    type: 'success' | 'error' | 'info';
+    title: string;
+    message: string;
+  } | null>(null);
 
   // Saldo inicial do investidor (pode vir do backend futuramente)
   const INITIAL_BALANCE = 15000; // R$ 15.000,00 inicial
@@ -72,6 +81,12 @@ export default function AgroFiMarketplace() {
     apyMedio: number;
     taxaSucesso: number;
     totalFinanciado: number;
+  } | null>(null);
+
+  // Estado para saldo AFI em tokens e valor em reais
+  const [afiBalance, setAfiBalance] = useState<{
+    tokens: number;
+    valueInReais: number;
   } | null>(null);
 
   // Calculate real market data from actual loans
@@ -106,6 +121,15 @@ export default function AgroFiMarketplace() {
     };
   }, [loans]);
   
+  // Função helper para exibir notificações
+  const showNotification = (type: 'success' | 'error' | 'info', title: string, message: string) => {
+    setNotification({ type, title, message });
+    // Auto-hide após 5 segundos
+    setTimeout(() => {
+      setNotification(null);
+    }, 5000);
+  };
+  
   // Estados para criação de empréstimo
   const [loanForm, setLoanForm] = useState<CreateLoanRequest>({
     requestedAmount: 0,
@@ -113,7 +137,7 @@ export default function AgroFiMarketplace() {
     maxInterestRate: 12.0,
     collateralAmount: 0,
     collateralType: 'soja',
-    warehouseLocation: ''
+    warehouseLocation: 'sorriso'
   });
   
   // Usar o tipo de usuário da autenticação se disponível, senão padrão para investidor
@@ -138,7 +162,6 @@ export default function AgroFiMarketplace() {
 
     try {
       if (userType === 'investor') {
-        setLoadingInvestments(true);
         const investments = await marketplaceAPIReal.getMyInvestments(token);
         setMyInvestments(investments);
 
@@ -186,11 +209,23 @@ export default function AgroFiMarketplace() {
         } catch (error) {
           console.error('❌ Erro ao carregar dashboard do produtor:', error);
         }
+
+        // Carregar saldo AFI do produtor
+        try {
+          const afiBalanceData = await afiAPI.getAFIBalance(token);
+          // 1 AFI token = R$ 1.50 (baseado na proporção 15000 AFI : 10000 USDC ≈ 1.5:1)
+          const AFI_TO_REAIS = 1;
+          setAfiBalance({
+            tokens: afiBalanceData.balance,
+            valueInReais: afiBalanceData.balance * AFI_TO_REAIS
+          });
+        } catch (error) {
+          console.error('❌ Erro ao carregar saldo AFI:', error);
+        }
       }
     } catch (error) {
       console.error('Erro ao carregar dados do usuário:', error);
     } finally {
-      setLoadingInvestments(false);
       setLoadingPositions(false);
     }
   };
@@ -302,7 +337,7 @@ export default function AgroFiMarketplace() {
     console.log('🐛 Debug handleCreateLoan:', { token, userType, user });
     
     if (!token || userType !== 'producer') {
-      alert(`❌ Apenas produtores autenticados podem criar empréstimos. Seu tipo: ${userType}`);
+      showNotification('error', 'Acesso Negado', `Apenas produtores autenticados podem criar empréstimos. Seu tipo: ${userType}`);
       return;
     }
 
@@ -310,7 +345,7 @@ export default function AgroFiMarketplace() {
       setLoading(true);
       await marketplaceAPIReal.createLoan(loanForm, token);
       
-      alert('✅ Solicitação de empréstimo criada com sucesso!');
+      showNotification('success', 'Empréstimo Criado!', 'Sua solicitação de empréstimo foi criada com sucesso e está disponível no marketplace.');
       
       // Recarregar empréstimos e limpar formulário
       await loadLoans();
@@ -325,7 +360,7 @@ export default function AgroFiMarketplace() {
       setSelectedTab('marketplace');
     } catch (err) {
       console.error('❌ Erro ao criar empréstimo:', err);
-      alert(`Erro ao criar empréstimo: ${err instanceof Error ? err.message : 'Erro desconhecido'}`);
+      showNotification('error', 'Erro ao Criar Empréstimo', err instanceof Error ? err.message : 'Erro desconhecido. Tente novamente.');
     } finally {
       setLoading(false);
     }
@@ -333,19 +368,19 @@ export default function AgroFiMarketplace() {
 
   const getRiskColor = (risk: 'A' | 'B' | 'C') => {
     switch(risk) {
-      case 'A': return 'bg-green-100 text-green-800 border-green-200';
-      case 'B': return 'bg-blue-100 text-blue-800 border-blue-200';
-      case 'C': return 'bg-red-100 text-red-800 border-red-200';
+      case 'A': return 'bg-gray-100 text-gray-800 border-gray-200';
+      case 'B': return 'bg-gray-200 text-gray-700 border-gray-300';
+      case 'C': return 'bg-gray-300 text-gray-600 border-gray-400';
       default: return 'bg-gray-100 text-gray-800 border-gray-200';
     }
   };
 
   const getStatusColor = (status: string) => {
     switch(status) {
-      case 'open': return 'bg-blue-100 text-blue-800 border-blue-200';
-      case 'funding': return 'bg-orange-100 text-orange-800 border-orange-200';
-      case 'funded': return 'bg-green-100 text-green-800 border-green-200';
-      case 'active': return 'bg-purple-100 text-purple-800 border-purple-200';
+      case 'open': return 'bg-gray-100 text-gray-800 border-gray-200';
+      case 'funding': return 'bg-slate-100 text-slate-800 border-slate-200';
+      case 'funded': return 'bg-gray-200 text-gray-700 border-gray-300';
+      case 'active': return 'bg-zinc-100 text-zinc-800 border-zinc-200';
       default: return 'bg-gray-100 text-gray-800 border-gray-200';
     }
   };
@@ -358,34 +393,67 @@ export default function AgroFiMarketplace() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 via-blue-50 to-indigo-50">
+    <div className="min-h-screen bg-gray-50">
       <div className="container mx-auto px-4 py-8">
+        <UserHeader />
         
-        {/* Header */}
-        <div className="text-center mb-8">
-          <div className="flex items-center justify-center gap-3 mb-4">
-            <div className="p-3 bg-green-100 rounded-full">
-              <Sprout className="h-10 w-10 text-green-600" />
-            </div>
-            <h1 className="text-4xl font-bold bg-gradient-to-r from-green-600 to-blue-600 bg-clip-text text-transparent">AgroFi</h1>
+        {/* Notificação */}
+        {notification && (
+          <div className="fixed top-4 right-4 z-50 max-w-md transform transition-all duration-300 ease-in-out animate-in slide-in-from-right">
+            <Card className={`border-l-4 shadow-lg ${
+              notification.type === 'success' ? 'border-l-gray-600 bg-gray-50' :
+              notification.type === 'error' ? 'border-l-red-500 bg-red-50' :
+              'border-l-gray-600 bg-gray-50'
+            }`}>
+              <CardContent className="p-4">
+                <div className="flex items-start gap-3">
+                  <div className="flex-shrink-0">
+                    {notification.type === 'success' && <CheckCircle className="h-5 w-5 text-gray-600" />}
+                    {notification.type === 'error' && <AlertTriangle className="h-5 w-5 text-red-600" />}
+                    {notification.type === 'info' && <Info className="h-5 w-5 text-gray-600" />}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h4 className={`font-semibold text-sm ${
+                      notification.type === 'success' ? 'text-gray-800' :
+                      notification.type === 'error' ? 'text-red-800' :
+                      'text-gray-800'
+                    }`}>
+                      {notification.title}
+                    </h4>
+                    <p className={`text-sm mt-1 ${
+                      notification.type === 'success' ? 'text-gray-700' :
+                      notification.type === 'error' ? 'text-red-700' :
+                      'text-gray-700'
+                    }`}>
+                      {notification.message}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setNotification(null)}
+                    className={`flex-shrink-0 rounded-lg p-1 hover:bg-white/50 transition-colors ${
+                      notification.type === 'success' ? 'text-gray-600 hover:text-gray-800' :
+                      notification.type === 'error' ? 'text-red-600 hover:text-red-800' :
+                      'text-gray-600 hover:text-gray-800'
+                    }`}
+                  >
+                    <span className="sr-only">Fechar</span>
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              </CardContent>
+            </Card>
           </div>
-          <p className="text-xl text-gray-700 max-w-2xl mx-auto font-medium">
-            Marketplace P2P para empréstimos agrícolas descentralizados
-          </p>
-          <p className="text-sm text-gray-500 mt-2">
-            Conectando produtores rurais diretamente a investidores
-          </p>
-        </div>
-
+        )}
+        
         {/* Market Overview - Personalizado por tipo de usuário */}
         {userType === 'investor' ? (
           // Visão do Mercado para INVESTIDORES
           <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-8">
-            <Card className="border-0 shadow-md bg-white/80 backdrop-blur-sm">
+            <Card className="border border-gray-200 shadow-sm bg-white">
               <CardContent className="p-6">
                 <div className="flex items-center gap-3">
-                  <div className="p-3 bg-blue-100 rounded-xl">
-                    <Target className="h-6 w-6 text-blue-600" />
+                  <div className="p-3 bg-gray-50 rounded-lg border border-gray-100">
+                    <Target className="h-6 w-6 text-gray-600" />
                   </div>
                   <div>
                     <p className="text-sm text-gray-500 font-medium">Oportunidades</p>
@@ -395,11 +463,11 @@ export default function AgroFiMarketplace() {
               </CardContent>
             </Card>
 
-            <Card className="border-0 shadow-md bg-white/80 backdrop-blur-sm">
+            <Card className="border border-gray-200 shadow-sm bg-white">
               <CardContent className="p-6">
                 <div className="flex items-center gap-3">
-                  <div className="p-3 bg-green-100 rounded-xl">
-                    <Wallet className="h-6 w-6 text-green-600" />
+                  <div className="p-3 bg-gray-50 rounded-lg border border-gray-100">
+                    <Wallet className="h-6 w-6 text-gray-600" />
                   </div>
                   <div>
                     <p className="text-sm text-gray-500 font-medium">Saldo Disponível</p>
@@ -411,11 +479,11 @@ export default function AgroFiMarketplace() {
               </CardContent>
             </Card>
 
-            <Card className="border-0 shadow-md bg-white/80 backdrop-blur-sm">
+            <Card className="border border-gray-200 shadow-sm bg-white">
               <CardContent className="p-6">
                 <div className="flex items-center gap-3">
-                  <div className="p-3 bg-purple-100 rounded-xl">
-                    <TrendingUp className="h-6 w-6 text-purple-600" />
+                  <div className="p-3 bg-gray-50 rounded-lg border border-gray-100">
+                    <TrendingUp className="h-6 w-6 text-gray-600" />
                   </div>
                   <div>
                     <p className="text-sm text-gray-500 font-medium">APY Médio</p>
@@ -427,11 +495,11 @@ export default function AgroFiMarketplace() {
               </CardContent>
             </Card>
 
-            <Card className="border-0 shadow-md bg-white/80 backdrop-blur-sm">
+            <Card className="border border-gray-200 shadow-sm bg-white">
               <CardContent className="p-6">
                 <div className="flex items-center gap-3">
-                  <div className="p-3 bg-emerald-100 rounded-xl">
-                    <Shield className="h-6 w-6 text-emerald-600" />
+                  <div className="p-3 bg-gray-50 rounded-lg border border-gray-100">
+                    <Shield className="h-6 w-6 text-gray-600" />
                   </div>
                   <div>
                     <p className="text-sm text-gray-500 font-medium">Taxa de Pagamento</p>
@@ -443,11 +511,11 @@ export default function AgroFiMarketplace() {
               </CardContent>
             </Card>
 
-            <Card className="border-0 shadow-md bg-white/80 backdrop-blur-sm">
+            <Card className="border border-gray-200 shadow-sm bg-white">
               <CardContent className="p-6">
                 <div className="flex items-center gap-3">
-                  <div className="p-3 bg-indigo-100 rounded-xl">
-                    <Wallet className="h-6 w-6 text-indigo-600" />
+                  <div className="p-3 bg-gray-50 rounded-lg border border-gray-100">
+                    <Coins className="h-6 w-6 text-gray-600" />
                   </div>
                   <div>
                     <p className="text-sm text-gray-500 font-medium">Meu Investido</p>
@@ -462,11 +530,11 @@ export default function AgroFiMarketplace() {
         ) : (
           // Visão do Mercado para PRODUTORES
           <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-8">
-            <Card className="border-0 shadow-md bg-white/80 backdrop-blur-sm">
+            <Card className="border border-gray-200 shadow-sm bg-white">
               <CardContent className="p-6">
                 <div className="flex items-center gap-3">
-                  <div className="p-3 bg-green-100 rounded-xl">
-                    <Sprout className="h-6 w-6 text-green-600" />
+                  <div className="p-3 bg-gray-50 rounded-lg border border-gray-100">
+                    <Sprout className="h-6 w-6 text-gray-600" />
                   </div>
                   <div>
                     <p className="text-sm text-gray-500 font-medium">Meus Empréstimos</p>
@@ -476,27 +544,32 @@ export default function AgroFiMarketplace() {
               </CardContent>
             </Card>
 
-            <Card className="border-0 shadow-md bg-white/80 backdrop-blur-sm">
+            <Card className="border border-gray-200 shadow-sm bg-white">
               <CardContent className="p-6">
                 <div className="flex items-center gap-3">
-                  <div className="p-3 bg-blue-100 rounded-xl">
-                    <Wallet className="h-6 w-6 text-blue-600" />
+                  <div className="p-3 bg-gray-50 rounded-lg border border-gray-100">
+                    <Coins className="h-6 w-6 text-gray-600" />
                   </div>
                   <div>
-                    <p className="text-sm text-gray-500 font-medium">Saldo Disponível</p>
+                    <p className="text-sm text-gray-500 font-medium">Saldo Disponível (AFI)</p>
                     <p className="text-2xl font-bold text-gray-900">
-                      {formatCurrency(myLoans.reduce((sum, loan) => sum + loan.currentFunding, 0))}
+                      {afiBalance ? formatCurrency(afiBalance.valueInReais) : 'R$ 0,00'}
                     </p>
+                    {afiBalance && (
+                      <p className="text-xs text-gray-500 mt-1">
+                        {afiBalance.tokens.toLocaleString()} tokens AFI • R$ 1,00/token
+                      </p>
+                    )}
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            <Card className="border-0 shadow-md bg-white/80 backdrop-blur-sm">
+            <Card className="border border-gray-200 shadow-sm bg-white">
               <CardContent className="p-6">
                 <div className="flex items-center gap-3">
-                  <div className="p-3 bg-emerald-100 rounded-xl">
-                    <TrendingUp className="h-6 w-6 text-emerald-600" />
+                  <div className="p-3 bg-gray-50 rounded-lg border border-gray-100">
+                    <TrendingUp className="h-6 w-6 text-gray-600" />
                   </div>
                   <div>
                     <p className="text-sm text-gray-500 font-medium">Total Solicitado</p>
@@ -508,11 +581,11 @@ export default function AgroFiMarketplace() {
               </CardContent>
             </Card>
 
-            <Card className="border-0 shadow-md bg-white/80 backdrop-blur-sm">
+            <Card className="border border-gray-200 shadow-sm bg-white">
               <CardContent className="p-6">
                 <div className="flex items-center gap-3">
-                  <div className="p-3 bg-purple-100 rounded-xl">
-                    <Target className="h-6 w-6 text-purple-600" />
+                  <div className="p-3 bg-gray-50 rounded-lg border border-gray-100">
+                    <Target className="h-6 w-6 text-gray-600" />
                   </div>
                   <div>
                     <p className="text-sm text-gray-500 font-medium">Empréstimos Ativos</p>
@@ -524,11 +597,11 @@ export default function AgroFiMarketplace() {
               </CardContent>
             </Card>
 
-            <Card className="border-0 shadow-md bg-white/80 backdrop-blur-sm">
+            <Card className="border border-gray-200 shadow-sm bg-white">
               <CardContent className="p-6">
                 <div className="flex items-center gap-3">
-                  <div className="p-3 bg-orange-100 rounded-xl">
-                    <Clock className="h-6 w-6 text-orange-600" />
+                  <div className="p-3 bg-gray-50 rounded-lg border border-gray-100">
+                    <Clock className="h-6 w-6 text-gray-600" />
                   </div>
                   <div>
                     <p className="text-sm text-gray-500 font-medium">Pagamentos Pendentes</p>
@@ -549,28 +622,33 @@ export default function AgroFiMarketplace() {
         )}
 
         {/* User Header */}
-        <UserHeader />
+        
 
         <Tabs value={selectedTab} onValueChange={setSelectedTab} className="w-full">
-          <TabsList className={`grid w-full bg-white/80 backdrop-blur-sm rounded-xl shadow-lg border-0 p-1 ${
+          <TabsList className={`grid w-full bg-white rounded-lg shadow-sm border border-gray-200 p-1 ${
             userType === 'producer' ? 'grid-cols-5' : 'grid-cols-2'
           }`}>
-            <TabsTrigger value="marketplace" className="rounded-lg font-medium">
-              🏪 Marketplace
+            <TabsTrigger value="marketplace" className="rounded-md font-medium flex items-center gap-2">
+              <Target className="h-4 w-4" />
+              Marketplace
             </TabsTrigger>
-            <TabsTrigger value="dashboard" className="rounded-lg font-medium">
-              📊 {userType === 'investor' ? 'Portfólio' : 'Meus Empréstimos'}
+            <TabsTrigger value="dashboard" className="rounded-md font-medium flex items-center gap-2">
+              <TrendingUp className="h-4 w-4" />
+              {userType === 'investor' ? 'Portfólio' : 'Meus Empréstimos'}
             </TabsTrigger>
             {userType === 'producer' && (
               <>
-                <TabsTrigger value="payments" className="rounded-lg font-medium">
-                  💳 Pagamentos
+                <TabsTrigger value="payments" className="rounded-md font-medium flex items-center gap-2">
+                  <Calendar className="h-4 w-4" />
+                  Pagamentos
                 </TabsTrigger>
-                <TabsTrigger value="afi" className="rounded-lg font-medium">
-                  🌟 AFI Tokens
+                <TabsTrigger value="afi" className="rounded-md font-medium flex items-center gap-2">
+                  <Coins className="h-4 w-4" />
+                  AFI Tokens
                 </TabsTrigger>
-                <TabsTrigger value="request" className="rounded-lg font-medium">
-                  ➕ Solicitar Empréstimo
+                <TabsTrigger value="request" className="rounded-md font-medium flex items-center gap-2">
+                  <Plus className="h-4 w-4" />
+                  Solicitar Empréstimo
                 </TabsTrigger>
               </>
             )}
@@ -598,7 +676,10 @@ export default function AgroFiMarketplace() {
               </div>
             ) : error ? (
               <Card className="p-6 text-center">
-                <div className="text-red-600 mb-4">❌ Erro ao carregar empréstimos</div>
+                <div className="text-red-600 mb-4 flex items-center justify-center gap-2">
+                  <AlertTriangle className="h-5 w-5" />
+                  Erro ao carregar empréstimos
+                </div>
                 <p className="text-gray-600 mb-4">{error}</p>
                 <Button onClick={() => loadLoans()} variant="outline">
                   Tentar novamente
@@ -606,18 +687,21 @@ export default function AgroFiMarketplace() {
               </Card>
             ) : loans.length === 0 ? (
               <Card className="p-8 text-center">
-                <div className="text-gray-400 text-lg mb-2">📋 Nenhum empréstimo disponível</div>
+                <div className="text-gray-400 text-lg mb-2 flex items-center justify-center gap-2">
+                  <Target className="h-5 w-5" />
+                  Nenhum empréstimo disponível
+                </div>
                 <p className="text-gray-600">Não há solicitações de empréstimo abertas no momento.</p>
               </Card>
             ) : (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {loans.map((loan) => (
-                <Card key={loan.id} className="hover:shadow-xl transition-all duration-300 border-0 shadow-md bg-white/90 backdrop-blur-sm hover:bg-white">
+                <Card key={loan.id} className="hover:shadow-lg transition-all duration-300 border border-gray-200 shadow-sm bg-white hover:border-gray-300">
                   <CardHeader>
                     <div className="flex items-start justify-between">
                       <div className="flex items-center gap-3">
                         <Avatar className="h-12 w-12">
-                          <AvatarFallback className="bg-gradient-to-br from-green-100 to-green-200 text-green-700 font-semibold">
+                          <AvatarFallback className="bg-gray-100 text-gray-700 font-semibold border border-gray-200">
                             {loan.producer.name ? loan.producer.name.split(' ').map(n => n[0]).join('') : 'P'}
                           </AvatarFallback>
                         </Avatar>
@@ -640,13 +724,13 @@ export default function AgroFiMarketplace() {
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <p className="text-sm text-gray-600">Valor Solicitado</p>
-                        <p className="text-xl font-bold text-green-600">
+                        <p className="text-xl font-bold text-gray-900">
                           {formatCurrency(loan.requestedAmount)}
                         </p>
                       </div>
                       <div>
                         <p className="text-sm text-gray-600">APY Projetado</p>
-                        <p className="text-xl font-bold text-blue-600">
+                        <p className="text-xl font-bold text-gray-700">
                           {loan.projectedAPY}%
                         </p>
                       </div>
@@ -655,11 +739,11 @@ export default function AgroFiMarketplace() {
                     {/* Producer Info */}
                     <div className="flex items-center justify-between text-sm">
                       <div className="flex items-center gap-1">
-                        <Star className="h-4 w-4 text-yellow-500" />
+                        <Star className="h-4 w-4 text-gray-500" />
                         <span>{loan.producer.reputation}/5.0</span>
                       </div>
                       <div className="flex items-center gap-1">
-                        <Shield className="h-4 w-4 text-green-500" />
+                        <Shield className="h-4 w-4 text-gray-500" />
                         <span>{loan.producer.reputation}/5 reputação</span>
                       </div>
                     </div>
@@ -723,7 +807,8 @@ export default function AgroFiMarketplace() {
                 <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto">
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
-                      🏦 Empréstimo P2P via Morpho Blue
+                      <Coins className="h-5 w-5" />
+                      Empréstimo P2P via Morpho Blue
                     </CardTitle>
                     <CardDescription>
                       Criando empréstimo real na blockchain com {loans.find(l => l.id === selectedLoan)?.producer.name || 'Produtor'}
@@ -748,26 +833,29 @@ export default function AgroFiMarketplace() {
                         {investmentAmount && (
                           <div className="space-y-4">
                             {/* Resumo P2P */}
-                            <div className="bg-gradient-to-r from-blue-50 to-purple-50 p-4 rounded-lg border">
-                              <h3 className="font-semibold text-gray-800 mb-3">📋 Resumo do Empréstimo P2P</h3>
+                            <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                              <h3 className="font-semibold text-gray-800 mb-3 flex items-center gap-2">
+                                <Info className="h-4 w-4" />
+                                Resumo do Empréstimo P2P
+                              </h3>
                               <div className="grid grid-cols-2 gap-4 text-sm">
                                 <div>
                                   <p className="text-gray-600">Você Empresta (USDC)</p>
-                                  <p className="font-bold text-blue-600">{formatCurrency(Number(investmentAmount))}</p>
+                                  <p className="font-bold text-gray-800">{formatCurrency(Number(investmentAmount))}</p>
                                 </div>
                                 <div>
                                   <p className="text-gray-600">Produtor Oferece (AFI)</p>
-                                  <p className="font-bold text-green-600">{estimatedCollateral.toLocaleString()} tokens</p>
+                                  <p className="font-bold text-gray-700">{estimatedCollateral.toLocaleString()} tokens</p>
                                 </div>
                                 <div>
                                   <p className="text-gray-600">Health Factor</p>
-                                  <p className={`font-bold ${healthFactor > 1.5 ? 'text-green-600' : healthFactor > 1.2 ? 'text-yellow-600' : 'text-red-600'}`}>
+                                  <p className={`font-bold ${healthFactor > 1.5 ? 'text-gray-800' : healthFactor > 1.2 ? 'text-gray-700' : 'text-gray-600'}`}>
                                     {healthFactor.toFixed(2)}
                                   </p>
                                 </div>
                                 <div>
                                   <p className="text-gray-600">Seus Juros (APY)</p>
-                                  <p className="font-bold text-purple-600">
+                                  <p className="font-bold text-gray-700">
                                     {loans.find(l => l.id === selectedLoan)?.projectedAPY}%
                                   </p>
                                 </div>
@@ -775,28 +863,46 @@ export default function AgroFiMarketplace() {
                             </div>
 
                             {/* Projeção de retorno */}
-                            <div className="bg-green-50 p-3 rounded-lg border border-green-200">
-                              <p className="text-sm font-medium text-green-800">💰 Projeção de Retorno</p>
-                              <p className="text-xl font-bold text-green-600">
+                            <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
+                              <p className="text-sm font-medium text-gray-800 flex items-center gap-2">
+                                <DollarSign className="h-4 w-4" />
+                                Projeção de Retorno
+                              </p>
+                              <p className="text-xl font-bold text-gray-800">
                                 {formatCurrency(Number(investmentAmount) * 1.082)}
                               </p>
-                              <p className="text-xs text-green-600">
+                              <p className="text-xs text-gray-600">
                                 em {loans.find(l => l.id === selectedLoan)?.termMonths} meses (incluindo juros)
                               </p>
                             </div>
 
                             {/* Explicação do processo */}
-                            <div className="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
+                            <div className="bg-amber-50 p-4 rounded-lg border border-amber-200">
                               <div className="flex items-start gap-3">
-                                <Info className="h-5 w-5 text-yellow-600 mt-0.5 flex-shrink-0" />
+                                <Info className="h-5 w-5 text-amber-600 mt-0.5 flex-shrink-0" />
                                 <div className="text-sm">
-                                  <p className="font-medium text-yellow-800 mb-2">Como funciona o P2P Lending:</p>
-                                  <ol className="text-yellow-700 space-y-1 list-decimal list-inside">
-                                    <li>🔍 Sistema verifica se PRODUTOR tem AFI tokens suficientes (150% do valor)</li>
-                                    <li>🏦 Cria posição P2P real via Morpho Blue na blockchain</li>
-                                    <li>🔒 Bloqueia colateral AFI do PRODUTOR automaticamente</li>
-                                    <li>💰 Seus USDC são transferidos para o produtor quando 100% financiado</li>
-                                    <li>📈 Você recebe juros sobre o valor emprestado</li>
+                                  <p className="font-medium text-amber-800 mb-2">Como funciona o P2P Lending:</p>
+                                  <ol className="text-amber-700 space-y-1 list-decimal list-inside">
+                                    <li className="flex items-start gap-2">
+                                      <span className="font-mono text-xs bg-amber-100 px-1 rounded">1</span>
+                                      Sistema verifica se PRODUTOR tem AFI tokens suficientes (150% do valor)
+                                    </li>
+                                    <li className="flex items-start gap-2">
+                                      <span className="font-mono text-xs bg-amber-100 px-1 rounded">2</span>
+                                      Cria posição P2P real via Morpho Blue na blockchain
+                                    </li>
+                                    <li className="flex items-start gap-2">
+                                      <span className="font-mono text-xs bg-amber-100 px-1 rounded">3</span>
+                                      Bloqueia colateral AFI do PRODUTOR automaticamente
+                                    </li>
+                                    <li className="flex items-start gap-2">
+                                      <span className="font-mono text-xs bg-amber-100 px-1 rounded">4</span>
+                                      Seus USDC são transferidos para o produtor quando 100% financiado
+                                    </li>
+                                    <li className="flex items-start gap-2">
+                                      <span className="font-mono text-xs bg-amber-100 px-1 rounded">5</span>
+                                      Você recebe juros sobre o valor emprestado
+                                    </li>
                                   </ol>
                                 </div>
                               </div>
@@ -813,11 +919,12 @@ export default function AgroFiMarketplace() {
                             Cancelar
                           </Button>
                           <Button
-                            className="flex-1 bg-gradient-to-r from-blue-600 to-purple-600"
+                            className="flex-1 bg-gray-800 hover:bg-gray-900"
                             disabled={!investmentAmount || Number(investmentAmount) <= 0}
                             onClick={startP2PFlow}
                           >
-                            🚀 Iniciar P2P Lending
+                            <ArrowRight className="h-4 w-4 mr-2" />
+                            Iniciar P2P Lending
                           </Button>
                         </div>
                       </>
@@ -834,12 +941,12 @@ export default function AgroFiMarketplace() {
                           <div className="space-y-3">
                             {/* Step 1: Validação */}
                             <div className={`flex items-center gap-3 p-3 rounded-lg border ${
-                              currentStep >= 1 ? 'bg-blue-50 border-blue-200' : 'bg-gray-50 border-gray-200'
+                              currentStep >= 1 ? 'bg-gray-50 border-gray-200' : 'bg-white border-gray-100'
                             }`}>
                               {p2pStatus === 'validating' && currentStep === 1 ? (
-                                <Loader2 className="h-5 w-5 text-blue-600 animate-spin" />
+                                <Loader2 className="h-5 w-5 text-gray-600 animate-spin" />
                               ) : currentStep > 1 ? (
-                                <CheckCircle className="h-5 w-5 text-green-600" />
+                                <CheckCircle className="h-5 w-5 text-gray-700" />
                               ) : (
                                 <div className="h-5 w-5 rounded-full border-2 border-gray-300" />
                               )}
@@ -851,12 +958,12 @@ export default function AgroFiMarketplace() {
 
                             {/* Step 2: Criação P2P */}
                             <div className={`flex items-center gap-3 p-3 rounded-lg border ${
-                              currentStep >= 2 ? 'bg-purple-50 border-purple-200' : 'bg-gray-50 border-gray-200'
+                              currentStep >= 2 ? 'bg-gray-50 border-gray-200' : 'bg-white border-gray-100'
                             }`}>
                               {p2pStatus === 'creating' && currentStep === 2 ? (
-                                <Loader2 className="h-5 w-5 text-purple-600 animate-spin" />
+                                <Loader2 className="h-5 w-5 text-gray-600 animate-spin" />
                               ) : currentStep > 2 ? (
-                                <CheckCircle className="h-5 w-5 text-green-600" />
+                                <CheckCircle className="h-5 w-5 text-gray-700" />
                               ) : (
                                 <div className="h-5 w-5 rounded-full border-2 border-gray-300" />
                               )}
@@ -868,12 +975,12 @@ export default function AgroFiMarketplace() {
 
                             {/* Step 3: Transferência */}
                             <div className={`flex items-center gap-3 p-3 rounded-lg border ${
-                              currentStep >= 3 ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-200'
+                              currentStep >= 3 ? 'bg-gray-50 border-gray-200' : 'bg-white border-gray-100'
                             }`}>
                               {p2pStatus === 'transferring' && currentStep === 3 ? (
-                                <Loader2 className="h-5 w-5 text-green-600 animate-spin" />
+                                <Loader2 className="h-5 w-5 text-gray-600 animate-spin" />
                               ) : currentStep > 3 ? (
-                                <CheckCircle className="h-5 w-5 text-green-600" />
+                                <CheckCircle className="h-5 w-5 text-gray-700" />
                               ) : (
                                 <div className="h-5 w-5 rounded-full border-2 border-gray-300" />
                               )}
@@ -885,12 +992,12 @@ export default function AgroFiMarketplace() {
 
                             {/* Step 4: Conclusão */}
                             <div className={`flex items-center gap-3 p-3 rounded-lg border ${
-                              currentStep >= 4 ? 'bg-emerald-50 border-emerald-200' : 'bg-gray-50 border-gray-200'
+                              currentStep >= 4 ? 'bg-gray-50 border-gray-200' : 'bg-white border-gray-100'
                             }`}>
                               {p2pStatus === 'completed' && currentStep === 4 ? (
-                                <CheckCircle className="h-5 w-5 text-emerald-600" />
+                                <CheckCircle className="h-5 w-5 text-gray-700" />
                               ) : currentStep === 4 ? (
-                                <CheckCircle className="h-5 w-5 text-green-600" />
+                                <CheckCircle className="h-5 w-5 text-gray-700" />
                               ) : (
                                 <div className="h-5 w-5 rounded-full border-2 border-gray-300" />
                               )}
@@ -934,12 +1041,12 @@ export default function AgroFiMarketplace() {
 
                         {/* Success Message */}
                         {p2pStatus === 'completed' && (
-                          <div className="bg-green-50 p-4 rounded-lg border border-green-200">
-                            <div className="flex items-center gap-2 text-green-800">
+                          <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                            <div className="flex items-center gap-2 text-gray-800">
                               <CheckCircle className="h-5 w-5" />
-                              <p className="font-medium">P2P Lending Realizado com Sucesso! 🎉</p>
+                              <p className="font-medium">P2P Lending Realizado com Sucesso!</p>
                             </div>
-                            <p className="text-sm text-green-700 mt-1">
+                            <p className="text-sm text-gray-700 mt-1">
                               Empréstimo de {formatCurrency(Number(investmentAmount))} criado via Morpho Blue.
                               O colateral AFI foi bloqueado e o USDC será transferido para o produtor.
                             </p>
@@ -973,7 +1080,7 @@ export default function AgroFiMarketplace() {
                             </>
                           ) : p2pStatus === 'completed' ? (
                             <Button
-                              className="w-full bg-green-600 hover:bg-green-700"
+                              className="w-full bg-gray-800 hover:bg-gray-900"
                               onClick={() => {
                                 setSelectedLoan(null);
                                 setInvestmentAmount('');
@@ -982,7 +1089,8 @@ export default function AgroFiMarketplace() {
                                 setCurrentStep(0);
                               }}
                             >
-                              ✅ Concluído
+                              <CheckCircle className="h-4 w-4 mr-2" />
+                              Concluído
                             </Button>
                           ) : (
                             <>
@@ -995,7 +1103,7 @@ export default function AgroFiMarketplace() {
                                 Cancelar
                               </Button>
                               <Button
-                                className="flex-1 bg-gradient-to-r from-blue-600 to-purple-600"
+                                className="flex-1 bg-gray-800 hover:bg-gray-900"
                                 disabled={investing || p2pStatus !== 'idle'}
                                 onClick={handleInvest}
                               >
@@ -1005,7 +1113,10 @@ export default function AgroFiMarketplace() {
                                     Processando P2P...
                                   </>
                                 ) : (
-                                  '🏦 Confirmar P2P Lending'
+                                  <>
+                                    <Coins className="h-4 w-4 mr-2" />
+                                    Confirmar P2P Lending
+                                  </>
                                 )}
                               </Button>
                             </>
@@ -1026,11 +1137,11 @@ export default function AgroFiMarketplace() {
               <div className="space-y-6">
                 {/* Cards de Métricas do Produtor */}
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                  <Card className="border-0 shadow-md bg-white/80 backdrop-blur-sm">
+                  <Card className="border border-gray-200 shadow-sm bg-white">
                     <CardContent className="p-6">
                       <div className="flex items-center gap-3">
-                        <div className="p-3 bg-green-100 rounded-xl">
-                          <DollarSign className="h-6 w-6 text-green-600" />
+                        <div className="p-3 bg-gray-50 rounded-lg border border-gray-100">
+                          <DollarSign className="h-6 w-6 text-gray-600" />
                         </div>
                         <div>
                           <p className="text-sm text-gray-500 font-medium">Volume Total</p>
@@ -1044,11 +1155,11 @@ export default function AgroFiMarketplace() {
                     </CardContent>
                   </Card>
 
-                  <Card className="border-0 shadow-md bg-white/80 backdrop-blur-sm">
+                  <Card className="border border-gray-200 shadow-sm bg-white">
                     <CardContent className="p-6">
                       <div className="flex items-center gap-3">
-                        <div className="p-3 bg-purple-100 rounded-xl">
-                          <TrendingUp className="h-6 w-6 text-purple-600" />
+                        <div className="p-3 bg-gray-50 rounded-lg border border-gray-100">
+                          <TrendingUp className="h-6 w-6 text-gray-600" />
                         </div>
                         <div>
                           <p className="text-sm text-gray-500 font-medium">APY Médio</p>
@@ -1062,11 +1173,11 @@ export default function AgroFiMarketplace() {
                     </CardContent>
                   </Card>
 
-                  <Card className="border-0 shadow-md bg-white/80 backdrop-blur-sm">
+                  <Card className="border border-gray-200 shadow-sm bg-white">
                     <CardContent className="p-6">
                       <div className="flex items-center gap-3">
-                        <div className="p-3 bg-emerald-100 rounded-xl">
-                          <Shield className="h-6 w-6 text-emerald-600" />
+                        <div className="p-3 bg-gray-50 rounded-lg border border-gray-100">
+                          <Shield className="h-6 w-6 text-gray-600" />
                         </div>
                         <div>
                           <p className="text-sm text-gray-500 font-medium">Taxa de Financiamento</p>
@@ -1080,11 +1191,11 @@ export default function AgroFiMarketplace() {
                     </CardContent>
                   </Card>
 
-                  <Card className="border-0 shadow-md bg-white/80 backdrop-blur-sm">
+                  <Card className="border border-gray-200 shadow-sm bg-white">
                     <CardContent className="p-6">
                       <div className="flex items-center gap-3">
-                        <div className="p-3 bg-indigo-100 rounded-xl">
-                          <Users className="h-6 w-6 text-indigo-600" />
+                        <div className="p-3 bg-gray-50 rounded-lg border border-gray-100">
+                          <Users className="h-6 w-6 text-gray-600" />
                         </div>
                         <div>
                           <p className="text-sm text-gray-500 font-medium">Financiado</p>
@@ -1325,7 +1436,8 @@ export default function AgroFiMarketplace() {
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
-                    🏦 Posições P2P Ativas via Morpho Blue
+                    <Coins className="h-5 w-5" />
+                    Posições P2P Ativas via Morpho Blue
                     {loadingPositions && <Loader2 className="h-4 w-4 animate-spin" />}
                   </CardTitle>
                   <CardDescription>
@@ -1335,7 +1447,10 @@ export default function AgroFiMarketplace() {
                 <CardContent>
                   {Object.keys(p2pPositions).length === 0 ? (
                     <div className="text-center py-8">
-                      <div className="text-gray-400 text-lg mb-2">🏦 Nenhuma posição P2P ativa</div>
+                      <div className="text-gray-400 text-lg mb-2 flex items-center justify-center gap-2">
+                        <Coins className="h-5 w-5" />
+                        Nenhuma posição P2P ativa
+                      </div>
                       <p className="text-gray-600">Você não possui empréstimos P2P ativos no momento.</p>
                     </div>
                   ) : (
@@ -1345,7 +1460,7 @@ export default function AgroFiMarketplace() {
                         const loan = loans.find(l => l.id === loanId);
 
                         return (
-                          <div key={loanId} className="border rounded-lg p-4 bg-gradient-to-r from-blue-50 to-purple-50">
+                          <div key={loanId} className="border rounded-lg p-4 bg-gray-50">
                             <div className="flex items-start justify-between mb-4">
                               <div>
                                 <h3 className="font-semibold text-lg">
@@ -1364,9 +1479,9 @@ export default function AgroFiMarketplace() {
                                   </Button>
                                 )}
                               </div>
-                              <Badge className={position.status === 'ACTIVE' ? 'bg-green-100 text-green-800' :
-                                               position.status === 'LIQUIDATED' ? 'bg-red-100 text-red-800' :
-                                               'bg-blue-100 text-blue-800'}>
+                              <Badge className={position.status === 'ACTIVE' ? 'bg-gray-100 text-gray-800' :
+                                               position.status === 'LIQUIDATED' ? 'bg-gray-200 text-gray-700' :
+                                               'bg-gray-100 text-gray-800'}>
                                 {position.status === 'ACTIVE' ? 'Ativo' :
                                  position.status === 'LIQUIDATED' ? 'Liquidado' :
                                  'Pago'}
@@ -1376,29 +1491,29 @@ export default function AgroFiMarketplace() {
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                               <div>
                                 <p className="text-gray-600">Principal Emprestado</p>
-                                <p className="font-bold text-blue-600">
+                                <p className="font-bold text-gray-800">
                                   {formatCurrency(parseFloat(position.principal))}
                                 </p>
                               </div>
                               <div>
                                 <p className="text-gray-600">Colateral AFI</p>
-                                <p className="font-bold text-green-600">
+                                <p className="font-bold text-gray-700">
                                   {parseFloat(position.collateral).toLocaleString()} tokens
                                 </p>
                               </div>
                               <div>
                                 <p className="text-gray-600">Health Factor</p>
                                 <p className={`font-bold ${
-                                  parseFloat(position.healthFactor) > 1.5 ? 'text-green-600' :
-                                  parseFloat(position.healthFactor) > 1.2 ? 'text-yellow-600' :
-                                  'text-red-600'
+                                  parseFloat(position.healthFactor) > 1.5 ? 'text-gray-800' :
+                                  parseFloat(position.healthFactor) > 1.2 ? 'text-gray-700' :
+                                  'text-gray-600'
                                 }`}>
                                   {parseFloat(position.healthFactor).toFixed(2)}
                                 </p>
                               </div>
                               <div>
                                 <p className="text-gray-600">Juros Acumulados</p>
-                                <p className="font-bold text-purple-600">
+                                <p className="font-bold text-gray-700">
                                   {formatCurrency(parseFloat(position.interestAccrued || '0'))}
                                 </p>
                               </div>
@@ -1407,8 +1522,18 @@ export default function AgroFiMarketplace() {
                             <div className="mt-4 pt-4 border-t border-gray-200">
                               <div className="flex items-center justify-between text-xs text-gray-500">
                                 <span>Vencimento: {new Date(position.maturityDate).toLocaleDateString('pt-BR')}</span>
-                                <span>
-                                  Health Factor {parseFloat(position.healthFactor) < 1.2 ? '⚠️ Próximo da liquidação' : '✅ Saudável'}
+                                <span className="flex items-center gap-1">
+                                  {parseFloat(position.healthFactor) < 1.2 ? (
+                                    <>
+                                      <AlertTriangle className="h-3 w-3" />
+                                      Próximo da liquidação
+                                    </>
+                                  ) : (
+                                    <>
+                                      <CheckCircle className="h-3 w-3" />
+                                      Saudável
+                                    </>
+                                  )}
                                 </span>
                               </div>
                             </div>
@@ -1475,16 +1600,6 @@ export default function AgroFiMarketplace() {
                         required
                       />
                     </div>
-                    <div>
-                      <Label htmlFor="warehouse">Armazém</Label>
-                      <Input 
-                        id="warehouse" 
-                        placeholder="Armazém Cargill - Sorriso"
-                        value={loanForm.warehouseLocation}
-                        onChange={(e) => setLoanForm({...loanForm, warehouseLocation: e.target.value})}
-                        required
-                      />
-                    </div>
 
                     <div>
                       <Label htmlFor="interest">Taxa Máxima (% ao ano)</Label>
@@ -1507,7 +1622,17 @@ export default function AgroFiMarketplace() {
                   )}
 
                   <Button type="submit" className="w-full" disabled={loading}>
-                    {loading ? '📤 Enviando...' : 'Enviar Solicitação'}
+                    {loading ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        Enviando...
+                      </>
+                    ) : (
+                      <>
+                        <ArrowRight className="h-4 w-4 mr-2" />
+                        Enviar Solicitação
+                      </>
+                    )}
                   </Button>
                 </form>
               </CardContent>
