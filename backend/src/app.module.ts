@@ -24,6 +24,7 @@ import { WalletService } from './services/wallet.service';
 import { AgroFiTokenService } from './services/agrofi-token.service';
 import { MorphoLendingService } from './services/morpho-lending.service';
 import { UsdcFaucetService } from './services/usdc-faucet.service';
+import { DocumentValidationService } from './services/document-validation.service';
 import { UserEntity } from './entities/user.entity';
 import { ProposalEntity } from './entities/proposal-db.entity';
 import { InvestmentEntity } from './entities/investment.entity';
@@ -51,6 +52,6 @@ import { InvestmentEntity } from './entities/investment.entity';
     TypeOrmModule.forFeature([UserEntity, ProposalEntity, InvestmentEntity]),
   ],
   controllers: [AppController, ProposalController, MorphoController, MorphoOnchainController, AuthController, AuthV2Controller, MarketplaceController, WalletController, MorphoOnChainController, AFITokenController],
-  providers: [AppService, ProposalService, RiskService, RepaymentService, DatabaseService, MorphoService, MorphoOnChainService, AccountAbstractionService, UserManagementService, MarketplaceService, WalletService, AgroFiTokenService, MorphoLendingService, UsdcFaucetService],
+  providers: [AppService, ProposalService, RiskService, RepaymentService, DatabaseService, MorphoService, MorphoOnChainService, AccountAbstractionService, UserManagementService, MarketplaceService, WalletService, AgroFiTokenService, MorphoLendingService, UsdcFaucetService, DocumentValidationService],
 })
 export class AppModule {}

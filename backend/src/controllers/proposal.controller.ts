@@ -1,8 +1,10 @@
-import { Controller, Get, Post, Body, Param, Query, Headers } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Query, Headers, UseInterceptors, UploadedFile } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { ProposalService } from '../services/proposal.service';
 import { RiskService } from '../services/risk.service';
 import { RepaymentService } from '../services/repayment.service';
 import { MarketplaceService } from '../services/marketplace.service';
+import { DocumentValidationService } from '../services/document-validation.service';
 
 @Controller('api')
 export class ProposalController {
@@ -11,6 +13,7 @@ export class ProposalController {
     private readonly riskService: RiskService,
     private readonly repaymentService: RepaymentService,
     private readonly marketplaceService: MarketplaceService,
+    private readonly documentValidationService: DocumentValidationService,
   ) {}
 
   // 🌱 APIS DO PRODUTOR
@@ -227,5 +230,92 @@ export class ProposalController {
   @Post('simulate/liquidation/:proposalId')
   async simulateLiquidation(@Param('proposalId') proposalId: string) {
     return await this.proposalService.simulateLiquidation(proposalId);
+  }
+
+  // 📄 APIS DE VALIDAÇÃO DE DOCUMENTOS
+
+  @Post('proposals/:id/validate-document')
+  @UseInterceptors(FileInterceptor('file'))
+  async validateProposalDocument(
+    @Param('id') proposalId: string,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    if (!file) {
+      return {
+        success: false,
+        message: 'Arquivo é obrigatório',
+      };
+    }
+
+    try {
+      const validation = await this.documentValidationService.validateForCollateral(
+        file,
+        proposalId,
+      );
+
+      return {
+        success: true,
+        data: {
+          proposalId,
+          approved: validation.approved,
+          isValid: validation.validationResult.isValid,
+          confidence: validation.validationResult.confidence,
+          riskScore: validation.riskScore,
+          extractedText: validation.validationResult.extractedText,
+          processedAt: validation.validationResult.processedAt,
+        },
+        message: validation.approved
+          ? 'Documento validado e aprovado para garantia'
+          : 'Documento não aprovado para garantia',
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: 'Erro ao validar documento',
+        error: error.message,
+      };
+    }
+  }
+
+  @Post('validate-document-text')
+  async validateDocumentText(@Body() body: { text: string; proposalId?: string }) {
+    try {
+      const result = await this.documentValidationService.validateText(
+        body.text,
+        body.proposalId,
+      );
+
+      return {
+        success: true,
+        data: result,
+        message: result.isValid
+          ? 'Documento válido'
+          : 'Documento inválido ou suspeito',
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: 'Erro ao validar texto',
+        error: error.message,
+      };
+    }
+  }
+
+  @Get('ml-health')
+  async checkMLAPIHealth() {
+    try {
+      const health = await this.documentValidationService.checkMLAPIHealth();
+      return {
+        success: true,
+        data: health,
+        message: 'API ML está funcionando',
+      };
+    } catch (error) {
+      return {
+        success: false,
+        message: 'API ML não disponível',
+        error: error.message,
+      };
+    }
   }
 }

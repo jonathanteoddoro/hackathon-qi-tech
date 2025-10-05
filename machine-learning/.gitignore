@@ -1,0 +1,118 @@
+# 🐍 Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# 🌐 Virtual Environment
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# 📊 Data & Models (gerados automaticamente)
+data/
+models/
+*.pkl
+*.joblib
+*.csv
+*.json
+
+# 📁 Upload temporário
+uploads/
+temp/
+tmp/
+
+# 🔧 Environment & Config
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# 📝 Logs
+*.log
+logs/
+server.log
+
+# 🖼️ Imagens temporárias
+*.jpg
+*.jpeg
+*.png
+*.gif
+*.bmp
+*.tiff
+*.pdf
+test_document.*
+documento_*.txt
+
+# 🧪 Arquivos de teste temporários
+test_*.txt
+teste_*.txt
+*_test.*
+
+# 💻 IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# 🍎 macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# 🐧 Linux
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+.nfs*
+
+# 🪟 Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+*.stackdump
+[Dd]esktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msix
+*.msm
+*.msp
+*.lnk
+
+# 📦 Node.js (caso adicione frontend)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# 🐳 Docker
+.dockerignore
+docker-compose.override.yml
+
+# 🧹 Arquivos de limpeza
+cleanup.sh
